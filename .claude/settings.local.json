@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dart pub global activate:*)",
+      "Bash(C:UsersSafeeAppDataLocalPubCachebinflutterfire configure --project=browserapp-project)",
+      "Bash(flutterfire configure:*)",
+      "Bash(\"C:\\Users\\Safee\\AppData\\Local\\Pub\\Cache\\bin\\flutterfire.bat\" configure --project=test-51a88)",
+      "Bash(flutter pub:*)",
+      "Bash(flutter run:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter build:*)",
+      "Bash(del \"lib\\components\\app_drawer.dart\")",
+      "Bash(flutter clean:*)",
+      "Bash(r)",
+      "Bash(dir:*)",
+      "Bash(find:*)",
+      "Bash(q)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
