@@ -15,7 +15,8 @@
       "Bash(dir:*)",
       "Bash(find:*)",
       "Bash(q)",
-      "Bash(C:Userssafeedevflutterbinflutter.bat analyze)"
+      "Bash(C:Userssafeedevflutterbinflutter.bat analyze)",
+      "Bash(del:*)"
     ],
     "deny": [],
     "ask": []
