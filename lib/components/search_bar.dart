@@ -201,7 +201,7 @@ class _SearchBarState extends State<SearchBar> {
           fontSize: 16,
           color: Colors.black87,
         ),
-        textAlign: TextAlign.center,
+        textAlign: TextAlign.left,
         textAlignVertical: TextAlignVertical.center,
         onSubmitted: (value) {
           if (value.trim().isNotEmpty) {

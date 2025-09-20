@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../components/search_bar.dart' as custom;
+import '../../components/top_search_bar.dart';
 import '../../services/news_service.dart';
 import '../news/all_news_screen.dart';
 import '../news/news_detail_screen.dart';
@@ -10,11 +11,13 @@ import '../../components/auth_dialog.dart';
 import '../../services/auth_service.dart';
 import '../../services/language_service.dart';
 import '../settings/settings_screen.dart';
+import '../settings/browsing_history_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../services/ad_block_service.dart';
 import '../../services/ad_overlay_service.dart';
+import '../../services/history_service.dart';
 import '../tabs/tab_manager_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../models/tab.dart';
@@ -186,8 +189,11 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isOnHomePage = true;
   String _currentUrl = '';
   String _pageTitle = 'BlueX';
+  bool _isSearchFocused = false;
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 1;
+  final GlobalKey<TopSearchBarState> _searchBarKey = GlobalKey<TopSearchBarState>();
+  bool _isDesktopMode = false;
 
   @override
   void initState() {
@@ -617,9 +623,27 @@ class _HomeScreenState extends State<HomeScreen> {
             });
           },
           onPageFinished: (String tabUrl) async {
-            await AdBlockService.injectAdBlocker(tabController);
-            await AdOverlayService.injectAdScripts(tabController);
+            // Apply ad blocking OR ad injection based on setting
+            if (AdBlockService.isEnabled) {
+              await AdBlockService.injectAdBlocker(tabController);
+            } else {
+              await AdOverlayService.injectAdScripts(tabController);
+              AdOverlayService.showInitialAd(context, tabController);
+              AdOverlayService.startAdTimer(context, tabController);
+            }
             String? title = await tabController.getTitle();
+
+            // Add to browsing history
+            try {
+              await HistoryService.addToHistory(
+                url: tabUrl,
+                title: title ?? 'Untitled',
+              );
+              print('📚 HISTORY DEBUG: Added to history - $title ($tabUrl)');
+            } catch (e) {
+              print('📚 HISTORY ERROR: Failed to add to history - $e');
+            }
+
             setState(() {
               _currentUrl = tabUrl;
               _pageTitle = title ?? 'Untitled';
@@ -631,17 +655,9 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             });
 
-            // Show overlay ads after page loads (if not blocked)
+            // Debug info
             print('🔴 HOME DEBUG: Page finished loading: $tabUrl');
             print('🔴 HOME DEBUG: AdBlockService.isEnabled = ${AdBlockService.isEnabled}');
-
-            if (!AdBlockService.isEnabled) {
-              print('🔴 HOME DEBUG: Ads are enabled, calling showInitialAd');
-              AdOverlayService.showInitialAd(context, tabController);
-              AdOverlayService.startAdTimer(context, tabController);
-            } else {
-              print('🔴 HOME DEBUG: Ads are blocked by AdBlockService');
-            }
           },
           onWebResourceError: (WebResourceError error) {
             print('WebView error: $error');
@@ -672,14 +688,116 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _clearSearchBar() {
+    _searchBarKey.currentState?.clearText();
+  }
+
+  void _toggleDesktopMode() async {
+    setState(() {
+      _isDesktopMode = !_isDesktopMode;
+    });
+
+    if (_currentController != null) {
+      try {
+        // Set user agent based on desktop mode
+        final newUserAgent = _isDesktopMode
+            ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            : 'Mozilla/5.0 (Linux; Android 10; SM-A325F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+
+        await _currentController!.setUserAgent(newUserAgent);
+        await _currentController!.reload();
+
+        // Show feedback
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isDesktopMode ? '🖥️ Switched to Desktop Mode' : '📱 Switched to Mobile Mode',
+              ),
+              duration: const Duration(seconds: 2),
+              backgroundColor: const Color(0xFF2196F3),
+            ),
+          );
+        }
+      } catch (e) {
+        print('Error toggling desktop mode: $e');
+        // Revert the state if failed
+        if (mounted) {
+          setState(() {
+            _isDesktopMode = !_isDesktopMode;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Failed to switch mode'),
+              duration: Duration(seconds: 2),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _showClearHistoryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Clear All History?'),
+          ],
+        ),
+        content: const Text(
+          'This will permanently delete all your browsing history. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await HistoryService.clearAllHistory();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ All browsing history cleared'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _clearCache() {
     if (_currentController != null) {
       _currentController!.clearCache();
       _currentController!.clearLocalStorage();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cache cleared successfully!'),
+          content: Text('✅ Cache and local storage cleared!'),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ No active page to clear cache'),
+          backgroundColor: Colors.orange,
           duration: Duration(seconds: 2),
         ),
       );
@@ -693,6 +811,8 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context) => TabManagerScreen(
           tabs: _tabs,
           onTabSelected: (index) {
+            // Close tab manager and switch to selected tab
+            Navigator.pop(context);
             setState(() {
               _activeTabIndex = index;
               _currentController = _tabs[index].controller;
@@ -702,6 +822,7 @@ class _HomeScreenState extends State<HomeScreen> {
             });
           },
           onTabClosed: (index) {
+            // Keep tab manager open, just update the tabs
             setState(() {
               if (_tabs.length > 1) {
                 _tabs.removeAt(index);
@@ -766,18 +887,22 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
 
-            // Desktop Mode
-            ListTile(
-              leading: const Icon(Icons.desktop_windows, color: Color(0xFF2196F3)),
-              title: const Text('Desktop Mode'),
-              trailing: Switch(
-                value: false, // TODO: Implement desktop mode state
-                onChanged: (value) {
-                  Navigator.pop(context);
-                  // TODO: Toggle desktop mode
-                },
+            // Desktop Mode (only show when browsing)
+            if (!_isOnHomePage)
+              ListTile(
+                leading: Icon(
+                  _isDesktopMode ? Icons.desktop_windows : Icons.phone_android,
+                  color: const Color(0xFF2196F3),
+                ),
+                title: const Text('Desktop Mode'),
+                trailing: Switch(
+                  value: _isDesktopMode,
+                  onChanged: (value) {
+                    Navigator.pop(context);
+                    _toggleDesktopMode();
+                  },
+                ),
               ),
-            ),
 
             // Ad Block toggle
             ListTile(
@@ -823,17 +948,44 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
 
-            // Browser Settings
+            // View History
             ListTile(
-              leading: const Icon(Icons.settings_applications, color: Color(0xFF2196F3)),
-              title: const Text('Browser Settings'),
+              leading: const Icon(Icons.history, color: Color(0xFF2196F3)),
+              title: const Text('View Browsing History'),
               onTap: () {
+                print('🔍 DEBUG: View History clicked');
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const SettingsScreen(),
+                    builder: (context) => const BrowsingHistoryScreen(),
                   ),
+                ).then((_) {
+                  print('🔍 DEBUG: Returned from history screen');
+                });
+              },
+            ),
+
+            // Clear History
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('Clear History'),
+              onTap: () {
+                Navigator.pop(context);
+                _showClearHistoryDialog();
+              },
+            ),
+
+            // Login/Signup
+            ListTile(
+              leading: const Icon(Icons.login, color: Color(0xFF2196F3)),
+              title: const Text('Login / Signup'),
+              onTap: () {
+                Navigator.pop(context);
+                showDialog(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (context) => const AuthDialog(),
                 );
               },
             ),
@@ -861,17 +1013,18 @@ class _HomeScreenState extends State<HomeScreen> {
               tooltip: 'Home',
             ),
 
-            // Search bar in the center
+            // Search bar in the center - NEW TOP SEARCH BAR
             Expanded(
               child: Container(
-                height: 40,
                 margin: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: custom.SearchBar(
+                child: TopSearchBar(
+                  key: _searchBarKey,
                   hintText: 'Search Google or type a URL',
+                  onFocusChanged: (hasFocus) {
+                    setState(() {
+                      _isSearchFocused = hasFocus;
+                    });
+                  },
                   onSearch: (query) {
                     String url = query.toLowerCase();
                     if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -887,6 +1040,40 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
+            // Back button (only show when not on home page AND search not focused)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: (!_isOnHomePage && !_isSearchFocused) ? 48 : 0,
+              child: (!_isOnHomePage && !_isSearchFocused)
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                      onPressed: () async {
+                        if (_currentController != null && await _currentController!.canGoBack()) {
+                          await _currentController!.goBack();
+                        }
+                      },
+                      tooltip: 'Back',
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
+            // Forward button (only show when not on home page AND search not focused)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: (!_isOnHomePage && !_isSearchFocused) ? 48 : 0,
+              child: (!_isOnHomePage && !_isSearchFocused)
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_forward, color: Colors.white, size: 24),
+                      onPressed: () async {
+                        if (_currentController != null && await _currentController!.canGoForward()) {
+                          await _currentController!.goForward();
+                        }
+                      },
+                      tooltip: 'Forward',
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
             // Dynamic button (Clear Cache on home, New Tab on pages)
             IconButton(
               icon: Icon(
@@ -894,7 +1081,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.white,
                 size: 24,
               ),
-              onPressed: _isOnHomePage ? _clearCache : () => _addNewTab('https://www.google.com'),
+              onPressed: _isOnHomePage ? _clearCache : () {
+                _addNewTab('https://www.google.com');
+                // Clear search bar when creating new tab
+                _clearSearchBar();
+              },
               tooltip: _isOnHomePage ? 'Clear Cache' : 'New Tab',
             ),
 
@@ -1230,14 +1421,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return Column(
-      children: [
-        // WebView
-        Expanded(
-          child: WebViewWidget(controller: _currentController!),
-        ),
-      ],
-    );
+    return WebViewWidget(controller: _currentController!);
   }
 
   Widget _buildQuickAccessIcon(

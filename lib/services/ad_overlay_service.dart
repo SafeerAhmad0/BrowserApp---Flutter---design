@@ -57,7 +57,7 @@ class AdOverlayService {
       return;
     }
 
-    // Just inject the ad scripts without showing any popup
+    // Just inject the ad scripts silently
     _isAdCurrentlyShowing = true;
     injectAdScripts(controller).then((_) {
       // Reset after 30 seconds to allow next ad

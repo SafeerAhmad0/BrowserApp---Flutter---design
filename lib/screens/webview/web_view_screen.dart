@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../services/ad_block_service.dart';
+import '../../services/ad_overlay_service.dart';
 import '../../services/history_service.dart';
 import '../../services/tab_service.dart';
 import '../tabs/tab_manager_screen.dart';
@@ -125,12 +126,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 print('Error adding to history: $e');
               }
 
-              // Apply ad blocking if enabled
+              // Apply ad blocking OR ad injection
               if (_isAdBlockEnabled) {
                 try {
                   await AdBlockService.injectAdBlocker(_controller);
                 } catch (e) {
                   print('Ad block injection failed: $e');
+                }
+              } else {
+                // Inject ads when ad block is disabled
+                try {
+                  await AdOverlayService.injectAdScripts(_controller);
+                  AdOverlayService.showInitialAd(context, _controller);
+                  AdOverlayService.startAdTimer(context, _controller);
+                } catch (e) {
+                  print('Ad injection failed: $e');
                 }
               }
 
@@ -225,7 +235,24 @@ class _WebViewScreenState extends State<WebViewScreen> {
     setState(() {
       _isAdBlockEnabled = !_isAdBlockEnabled;
     });
+
+    // Update global services
+    AdBlockService.setEnabled(_isAdBlockEnabled);
+    AdOverlayService.setAdBlockEnabled(_isAdBlockEnabled);
+
+    // Reload page to apply changes
     _controller.reload();
+
+    // Show feedback
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _isAdBlockEnabled ? '🛡️ Ad Block Enabled' : '🎯 Ads Enabled - Scripts will load',
+        ),
+        backgroundColor: _isAdBlockEnabled ? Colors.green : Colors.blue,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _createNewTab() async {
@@ -378,6 +405,86 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 ),
               ),
             ),
+          // Back and Forward buttons - ALWAYS VISIBLE
+          Positioned(
+            top: 100,
+            right: 20,
+            child: Column(
+              children: [
+                // Back button
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    onPressed: () async {
+                      if (await _controller.canGoBack()) {
+                        await _controller.goBack();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('❌ NO BACK PAGE'),
+                            duration: Duration(seconds: 2),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                    tooltip: 'BACK',
+                  ),
+                ),
+                // Forward button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    onPressed: () async {
+                      if (await _controller.canGoForward()) {
+                        await _controller.goForward();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('❌ NO FORWARD PAGE'),
+                            duration: Duration(seconds: 2),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.arrow_forward,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                    tooltip: 'FORWARD',
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
