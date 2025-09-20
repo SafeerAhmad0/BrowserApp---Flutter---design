@@ -201,6 +201,7 @@ class _SearchBarState extends State<SearchBar> {
           fontSize: 16,
           color: Colors.black87,
         ),
+        textAlign: TextAlign.center,
         onSubmitted: (value) {
           if (value.trim().isNotEmpty) {
             widget.onSearch(value.trim());

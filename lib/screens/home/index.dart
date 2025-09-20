@@ -13,6 +13,11 @@ import '../settings/settings_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_core/firebase_core.dart';
+import '../../services/ad_block_service.dart';
+import '../../services/ad_overlay_service.dart';
+import '../tabs/tab_manager_screen.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import '../../models/tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,19 +26,195 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+class AdSlot extends StatelessWidget {
+  final String title;
+  final String? imageUrl;
+  final VoidCallback? onTap;
+
+  const AdSlot({
+    super.key,
+    required this.title,
+    this.imageUrl,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        margin: const EdgeInsets.symmetric(
+          horizontal: 16.0,
+          vertical: 8.0,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.yellow.shade100,
+              Colors.orange.shade100,
+              Colors.red.shade50,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: Colors.red.shade300,
+            width: 3,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.red.withOpacity(0.3),
+              offset: const Offset(0, 4),
+              blurRadius: 12,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (imageUrl != null)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15.0),
+                ),
+                child: Container(
+                  height: 150,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.red.shade200,
+                        Colors.orange.shade200,
+                      ],
+                    ),
+                  ),
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.campaign,
+                          size: 50,
+                          color: Colors.red,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '🎯 ADVERTISEMENT 🎯',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade600,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.3),
+                          offset: const Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      '🟢 SPONSORED AD',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.0,
+                      color: Color(0xFF1976D2),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '🎯 Your ad network content will appear here - Perfect spot for native advertising!',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 14.0,
+                      fontWeight: FontWeight.w600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HomeScreenState extends State<HomeScreen> {
   List<NewsArticle> _newsArticles = [];
   bool _isLoadingNews = true;
+  bool _isLoadingMoreNews = false;
   bool _isAdmin = false;
   final AuthService _authService = AuthService();
+  final List<BrowserTab> _tabs = [];
+  int _activeTabIndex = 0;
+  WebViewController? _currentController;
+  bool _isOnHomePage = true;
+  String _currentUrl = '';
+  String _pageTitle = 'BlueX';
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
 
   @override
   void initState() {
     super.initState();
     _loadNews();
     _checkAdminStatus();
+    _setupScrollListener();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showNotificationsSlideshow();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    AdOverlayService.dispose();
+    super.dispose();
+  }
+
+  void _setupScrollListener() {
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+        // Load more news when user is 200 pixels from the bottom
+        if (!_isLoadingMoreNews) {
+          _loadMoreNews();
+        }
+      }
     });
   }
 
@@ -52,6 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _newsArticles = articles;
           _isLoadingNews = false;
+          _currentPage = 1;
         });
       }
     } catch (e) {
@@ -59,6 +241,55 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoadingNews = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMoreNews() async {
+    if (_isLoadingMoreNews) return;
+
+    setState(() {
+      _isLoadingMoreNews = true;
+    });
+
+    try {
+      // Simulate loading more news from different categories
+      List<NewsArticle> moreArticles = [];
+
+      switch (_currentPage % 6) {
+        case 1:
+          moreArticles = await NewsService.getTechNews();
+          break;
+        case 2:
+          moreArticles = await NewsService.getBusinessNews();
+          break;
+        case 3:
+          moreArticles = await NewsService.getSportsNews();
+          break;
+        case 4:
+          moreArticles = await NewsService.getHealthNews();
+          break;
+        case 5:
+          moreArticles = await NewsService.getScienceNews();
+          break;
+        case 0:
+          moreArticles = await NewsService.getEntertainmentNews();
+          break;
+      }
+
+      if (mounted) {
+        setState(() {
+          _newsArticles.addAll(moreArticles);
+          _currentPage++;
+          _isLoadingMoreNews = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading more news: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingMoreNews = false;
         });
       }
     }
@@ -369,51 +600,405 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _addNewTab(String url) {
+    late WebViewController tabController;
+
+    tabController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            return AdBlockService.handleNavigation(request);
+          },
+          onPageStarted: (String tabUrl) {
+            setState(() {
+              _isOnHomePage = false;
+              _currentUrl = tabUrl;
+            });
+          },
+          onPageFinished: (String tabUrl) async {
+            await AdBlockService.injectAdBlocker(tabController);
+            await AdOverlayService.injectAdScripts(tabController);
+            String? title = await tabController.getTitle();
+            setState(() {
+              _currentUrl = tabUrl;
+              _pageTitle = title ?? 'Untitled';
+              if (_tabs.isNotEmpty && _activeTabIndex < _tabs.length) {
+                _tabs[_activeTabIndex] = _tabs[_activeTabIndex].copyWith(
+                  title: _pageTitle,
+                  url: tabUrl,
+                );
+              }
+            });
+
+            // Show overlay ads after page loads (if not blocked)
+            print('🔴 HOME DEBUG: Page finished loading: $tabUrl');
+            print('🔴 HOME DEBUG: AdBlockService.isEnabled = ${AdBlockService.isEnabled}');
+
+            if (!AdBlockService.isEnabled) {
+              print('🔴 HOME DEBUG: Ads are enabled, calling showInitialAd');
+              AdOverlayService.showInitialAd(context, tabController);
+              AdOverlayService.startAdTimer(context, tabController);
+            } else {
+              print('🔴 HOME DEBUG: Ads are blocked by AdBlockService');
+            }
+          },
+          onWebResourceError: (WebResourceError error) {
+            print('WebView error: $error');
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(url));
+
+    setState(() {
+      _tabs.add(BrowserTab(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: 'Loading...',
+        url: url,
+        controller: tabController,
+      ));
+      _activeTabIndex = _tabs.length - 1;
+      _currentController = tabController;
+      _isOnHomePage = false;
+      _currentUrl = url;
+    });
+  }
+
+  void _goHome() {
+    setState(() {
+      _isOnHomePage = true;
+      _pageTitle = 'BlueX';
+      _currentUrl = '';
+    });
+  }
+
+  void _clearCache() {
+    if (_currentController != null) {
+      _currentController!.clearCache();
+      _currentController!.clearLocalStorage();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cache cleared successfully!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _showTabManager() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TabManagerScreen(
+          tabs: _tabs,
+          onTabSelected: (index) {
+            setState(() {
+              _activeTabIndex = index;
+              _currentController = _tabs[index].controller;
+              _currentUrl = _tabs[index].url;
+              _pageTitle = _tabs[index].title;
+              _isOnHomePage = false;
+            });
+          },
+          onTabClosed: (index) {
+            setState(() {
+              if (_tabs.length > 1) {
+                _tabs.removeAt(index);
+                if (_activeTabIndex >= _tabs.length) {
+                  _activeTabIndex = _tabs.length - 1;
+                }
+                if (_activeTabIndex >= 0) {
+                  _currentController = _tabs[_activeTabIndex].controller;
+                  _currentUrl = _tabs[_activeTabIndex].url;
+                  _pageTitle = _tabs[_activeTabIndex].title;
+                }
+              } else {
+                _tabs.clear();
+                _currentController = null;
+                _isOnHomePage = true;
+                _pageTitle = 'BlueX';
+                _currentUrl = '';
+              }
+            });
+          },
+          onNewTab: () {
+            _addNewTab('https://www.google.com');
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showSettingsMenu() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Translate option
+            ListTile(
+              leading: const Icon(Icons.translate, color: Color(0xFF2196F3)),
+              title: const Text('Translate'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement translate functionality
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Translate feature coming soon!')),
+                );
+              },
+            ),
+
+            // Desktop Mode
+            ListTile(
+              leading: const Icon(Icons.desktop_windows, color: Color(0xFF2196F3)),
+              title: const Text('Desktop Mode'),
+              trailing: Switch(
+                value: false, // TODO: Implement desktop mode state
+                onChanged: (value) {
+                  Navigator.pop(context);
+                  // TODO: Toggle desktop mode
+                },
+              ),
+            ),
+
+            // Ad Block toggle
+            ListTile(
+              leading: Icon(
+                AdBlockService.isEnabled ? Icons.shield : Icons.shield_outlined,
+                color: AdBlockService.isEnabled ? Colors.green : Colors.grey,
+              ),
+              title: const Text('Ad Block'),
+              trailing: Switch(
+                value: AdBlockService.isEnabled,
+                onChanged: (value) {
+                  print('🔴 TOGGLE DEBUG: Ad Block toggle changed to: $value');
+                  setState(() {
+                    AdBlockService.setEnabled(value);
+                    AdOverlayService.setAdBlockEnabled(value);
+                  });
+                  print('🔴 TOGGLE DEBUG: AdBlockService.isEnabled = ${AdBlockService.isEnabled}');
+                  print('🔴 TOGGLE DEBUG: AdOverlayService.isAdBlockEnabled = ${AdOverlayService.isAdBlockEnabled}');
+
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        value ? 'Ad Block enabled' : 'Ad Block disabled',
+                      ),
+                      backgroundColor: value ? Colors.green : Colors.orange,
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // Ad Block Settings
+            ListTile(
+              leading: const Icon(Icons.settings, color: Color(0xFF2196F3)),
+              title: const Text('Ad Block Settings'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to ad block settings
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ad Block settings coming soon!')),
+                );
+              },
+            ),
+
+            // Browser Settings
+            ListTile(
+              leading: const Icon(Icons.settings_applications, color: Color(0xFF2196F3)),
+              title: const Text('Browser Settings'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          LanguageService.translate('app_name'),
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
         backgroundColor: const Color(0xFF2196F3),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SettingsScreen(),
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            // Home button
+            IconButton(
+              icon: const Icon(Icons.home, color: Colors.white, size: 24),
+              onPressed: _goHome,
+              tooltip: 'Home',
+            ),
+
+            // Search bar in the center
+            Expanded(
+              child: Container(
+                height: 40,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF2196F3),
-              Color(0xFF1976D2),
-              Colors.white,
-            ],
-            stops: [0.0, 0.3, 1.0],
-          ),
+                child: custom.SearchBar(
+                  hintText: 'Search Google or type a URL',
+                  onSearch: (query) {
+                    String url = query.toLowerCase();
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                      if (Uri.tryParse(url)?.hasScheme ?? false) {
+                        url = 'https://$url';
+                      } else {
+                        url = 'https://www.google.com/search?q=${Uri.encodeComponent(query)}';
+                      }
+                    }
+                    _addNewTab(url);
+                  },
+                ),
+              ),
+            ),
+
+            // Dynamic button (Clear Cache on home, New Tab on pages)
+            IconButton(
+              icon: Icon(
+                _isOnHomePage ? Icons.whatshot : Icons.add,
+                color: Colors.white,
+                size: 24,
+              ),
+              onPressed: _isOnHomePage ? _clearCache : () => _addNewTab('https://www.google.com'),
+              tooltip: _isOnHomePage ? 'Clear Cache' : 'New Tab',
+            ),
+
+            // Tabs button
+            IconButton(
+              icon: Stack(
+                children: [
+                  const Icon(Icons.tab, color: Colors.white, size: 24),
+                  if (_tabs.isNotEmpty)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '${_tabs.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              onPressed: _showTabManager,
+              tooltip: 'Tabs',
+            ),
+
+            // Three-dot menu
+            IconButton(
+              icon: const Icon(Icons.more_vert, color: Colors.white, size: 24),
+              onPressed: _showSettingsMenu,
+              tooltip: 'Menu',
+            ),
+          ],
         ),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-            // 🔎 Search Bar with improved styling
+      ),
+      body: _isOnHomePage ? _buildHomePage() : _buildWebViewPage(),
+    );
+  }
+
+  Widget _buildHomePage() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF2196F3),
+            Color(0xFF1976D2),
+            Colors.white,
+          ],
+          stops: [0.0, 0.3, 1.0],
+        ),
+      ),
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          children: [
+            // BlueX Header with Google-like styling and italic X
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 40),
+              child: RichText(
+                text: const TextSpan(
+                  style: TextStyle(
+                    fontSize: 72,
+                    fontWeight: FontWeight.w300,
+                    color: Colors.white,
+                    letterSpacing: -2,
+                    shadows: [
+                      Shadow(
+                        offset: Offset(2, 2),
+                        blurRadius: 4,
+                        color: Colors.black26,
+                      ),
+                    ],
+                  ),
+                  children: [
+                    TextSpan(text: 'Blue'),
+                    TextSpan(
+                      text: 'X',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Search Bar right after BlueX logo
             Container(
               margin: const EdgeInsets.all(20.0),
               decoration: BoxDecoration(
@@ -428,49 +1013,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               child: custom.SearchBar(
-                hintText: LanguageService.translate('search'),
+                hintText: 'Search Google or type a URL',
                 onSearch: (query) {
                   String url = query.toLowerCase();
                   if (!url.startsWith('http://') && !url.startsWith('https://')) {
                     if (Uri.tryParse(url)?.hasScheme ?? false) {
-                      // URL without scheme but valid
                       url = 'https://$url';
                     } else {
-                      // Not a URL, do a Google search
                       url = 'https://www.google.com/search?q=${Uri.encodeComponent(query)}';
                     }
                   }
-
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => WebViewScreen(
-                        url: url,
-                        title: 'Browser',
-                      ),
-                    ),
-                  );
+                  _addNewTab(url);
                 },
               ),
             ),
 
-            // Welcome text
-            // Container(
-            //   margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            //   child: const Text(
-            //     "Quick Access",
-            //     style: TextStyle(
-            //       fontSize: 22,
-            //       fontWeight: FontWeight.bold,
-            //       color: Colors.white,
-            //     ),
-            //   ),
-            // ),
-
-            // 🌐 Shortcut Websites Grid with improved design
+            // Scrollable Quick Access Icons Row with White Background
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -482,179 +1043,79 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const WebViewScreen(
-                            url: 'https://www.google.com',
-                            title: 'Google Search',
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFF2196F3).withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.language, size: 24, color: const Color(0xFF2196F3)),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "Google",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1976D2),
-                            ),
-                          ),
-                        ],
-                      ),
+              child: SizedBox(
+                height: 80,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _buildQuickAccessIcon(
+                      'ChatGPT',
+                      Icons.chat,
+                      Colors.green,
+                      'https://chat.openai.com',
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const WebViewScreen(
-                            url: 'https://www.youtube.com',
-                            title: 'YouTube',
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.red.withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.video_library, size: 24, color: Colors.red[600]),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "YouTube",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1976D2),
-                            ),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(width: 16),
+                    _buildQuickAccessIcon(
+                      'Grokai',
+                      Icons.psychology,
+                      Colors.purple,
+                      'https://groq.com',
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const WebViewScreen(
-                            url: 'https://www.facebook.com',
-                            title: 'Facebook',
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.blue.withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.facebook, size: 24, color: Colors.blue[900]),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "Facebook",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1976D2),
-                            ),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(width: 16),
+                    _buildQuickAccessIcon(
+                      'Amazon',
+                      Icons.shopping_bag,
+                      Colors.orange,
+                      'https://www.amazon.com',
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const WebViewScreen(
-                            url: 'https://www.amazon.com',
-                            title: 'Shopping',
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.shopping_bag, size: 24, color: Colors.green[600]),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "Shopping",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1976D2),
-                            ),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(width: 16),
+                    _buildQuickAccessIcon(
+                      'Daraz',
+                      Icons.local_mall,
+                      Colors.deepOrange,
+                      'https://www.daraz.pk',
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    _buildQuickAccessIcon(
+                      'YouTube',
+                      Icons.video_library,
+                      Colors.red,
+                      'https://www.youtube.com',
+                    ),
+                    const SizedBox(width: 16),
+                    _buildQuickAccessIcon(
+                      'Facebook',
+                      Icons.facebook,
+                      Colors.blue,
+                      'https://www.facebook.com',
+                    ),
+                    const SizedBox(width: 16),
+                    _buildQuickAccessIcon(
+                      'Google',
+                      Icons.search,
+                      Colors.blue,
+                      'https://www.google.com',
+                    ),
+                    const SizedBox(width: 16),
+                    _buildQuickAccessIcon(
+                      'Twitter',
+                      Icons.alternate_email,
+                      Colors.lightBlue,
+                      'https://www.twitter.com',
+                    ),
+                    const SizedBox(width: 16),
+                    _buildQuickAccessIcon(
+                      'Instagram',
+                      Icons.camera_alt,
+                      Colors.pink,
+                      'https://www.instagram.com',
+                    ),
+                    const SizedBox(width: 20), // Extra space at the end
+                  ],
                 ),
-                ],
               ),
             ),
+
 
             const SizedBox(height: 20),
 
@@ -710,7 +1171,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // 📰 News Feed
+            // 📰 News Feed with Ad Slots (2→ad→3→ad→3→ad pattern)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               decoration: const BoxDecoration(
@@ -726,133 +1187,259 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     )
-                  : Column(
-                      children: _newsArticles.map((article) {
-                          return InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => NewsDetailScreen(article: article),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(15),
-                            child: Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 8.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(15),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  offset: const Offset(0, 2),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                              border: Border.all(
-                                color: const Color(0xFF2196F3).withOpacity(0.1),
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (article.urlToImage != null)
-                                  ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(15.0),
-                                    ),
-                                child: Image.network(
-                                  article.urlToImage!,
-                                  height: 200,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const SizedBox.shrink();
-                                  },
-                                    ),
-                                  ),
-                                Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        article.title,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16.0,
-                                          color: Color(0xFF1976D2),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8.0),
-                                      Text(
-                                        article.description,
-                                        style: TextStyle(
-                                          color: Colors.grey[700],
-                                          fontSize: 14.0,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12.0),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF2196F3).withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Text(
-                                              article.source,
-                                              style: const TextStyle(
-                                                color: Color(0xFF1976D2),
-                                                fontSize: 11.0,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                          Flexible(
-                                            child: Text(
-                                              article.author ?? '',
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 11.0,
-                                              ),
-                                              textAlign: TextAlign.end,
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                  : _buildNewsFeedWithAds(),
+            ),
+
+            // Loading indicator for more news
+            if (_isLoadingMoreNews)
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: const Column(
+                  children: [
+                    CircularProgressIndicator(
+                      color: Color(0xFF2196F3),
+                      strokeWidth: 2,
                     ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Loading more news...',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
-              // Extra padding at bottom for better scrolling
-              const SizedBox(height: 50),
-            ],
-          ),
+            // Extra padding at bottom for better scrolling
+            const SizedBox(height: 50),
+          ],
         ),
       ),
+    );
+  }
 
-      // No bottom navigation bar needed
+  Widget _buildWebViewPage() {
+    if (_tabs.isEmpty || _currentController == null) {
+      return const Center(
+        child: Text(
+          'No page loaded',
+          style: TextStyle(fontSize: 18, color: Colors.grey),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // WebView
+        Expanded(
+          child: WebViewWidget(controller: _currentController!),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickAccessIcon(
+    String title,
+    IconData icon,
+    Color color,
+    String url,
+  ) {
+    return InkWell(
+      onTap: () => _addNewTab(url),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 24, color: color),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewsFeedWithAds() {
+    List<Widget> items = [];
+    int newsIndex = 0;
+    int adCounter = 0;
+
+    // Pattern: 2 news → ad → 3 news → ad → 3 news → ad → repeat
+    while (newsIndex < _newsArticles.length) {
+      // Add 2 news articles first
+      int articlesToAdd = (adCounter == 0) ? 2 : 3;
+
+      for (int i = 0; i < articlesToAdd && newsIndex < _newsArticles.length; i++) {
+        items.add(_buildNewsCard(_newsArticles[newsIndex]));
+        newsIndex++;
+      }
+
+      // Add ad slot after every group
+      if (newsIndex < _newsArticles.length) {
+        items.add(AdSlot(
+          title: 'Advertisement ${adCounter + 1}',
+          imageUrl: 'placeholder',
+          onTap: () {
+            // TODO: Handle ad click
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Ad clicked! (Placeholder)'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+        ));
+        adCounter++;
+      }
+    }
+
+    return Column(children: items);
+  }
+
+  Widget _buildNewsCard(NewsArticle article) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NewsDetailScreen(article: article),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        margin: const EdgeInsets.symmetric(
+          horizontal: 16.0,
+          vertical: 8.0,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
+          border: Border.all(
+            color: const Color(0xFF2196F3).withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (article.urlToImage != null)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15.0),
+                ),
+                child: Image.network(
+                  article.urlToImage!,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    article.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.0,
+                      color: Color(0xFF1976D2),
+                    ),
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    article.description,
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 14.0,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2196F3).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          article.source,
+                          style: const TextStyle(
+                            color: Color(0xFF1976D2),
+                            fontSize: 11.0,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Flexible(
+                        child: Text(
+                          article.author ?? '',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 11.0,
+                          ),
+                          textAlign: TextAlign.end,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
+

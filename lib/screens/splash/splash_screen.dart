@@ -81,12 +81,15 @@ class _SplashScreenState extends State<SplashScreen>
               child: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFF87CEEB), // Light blue
+                      Color(0xFF64B5F6), // Light blue
                       Color(0xFF2196F3), // Blue
+                      Color(0xFF1976D2), // Darker blue
+                      Color(0xFF0D47A1), // Deep blue
                     ],
+                    stops: [0.0, 0.4, 0.8, 1.0],
                   ),
                 ),
                 child: Center(
@@ -95,59 +98,109 @@ class _SplashScreenState extends State<SplashScreen>
                     children: [
                       // App Icon/Logo
                       Container(
-                        width: 100,
-                        height: 100,
+                        width: 120,
+                        height: 120,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(25),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 25,
+                              offset: const Offset(0, 15),
                             ),
                           ],
                         ),
                         child: const Icon(
-                          Icons.language,
-                          size: 60,
+                          Icons.security,
+                          size: 70,
                           color: Color(0xFF2196F3),
                         ),
                       ),
                       const SizedBox(height: 30),
 
-                      // App Name
-                      const Text(
-                        'BrowserApp',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          shadows: [
-                            Shadow(
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
-                              color: Colors.black26,
+                      // App Name with Rich Text for styling
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: const TextSpan(
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                offset: Offset(0, 3),
+                                blurRadius: 6,
+                                color: Colors.black26,
+                              ),
+                            ],
+                          ),
+                          children: [
+                            TextSpan(text: 'Blue'),
+                            TextSpan(
+                              text: 'X',
+                              style: TextStyle(
+                                fontStyle: FontStyle.italic,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
+                            TextSpan(text: ' Browser'),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+
+                      // Subtitle with new description
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Text(
+                          'Safe, Secure & Proxy Ad Block',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.white.withOpacity(0.95),
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                            shadows: [
+                              Shadow(
+                                offset: const Offset(0, 1),
+                                blurRadius: 2,
+                                color: Colors.black.withOpacity(0.3),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 10),
 
+                      // Additional features text
                       Text(
-                        'Your Ultimate Browsing Experience',
+                        'Fast • Private • Secure',
                         style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withOpacity(0.9),
-                          fontWeight: FontWeight.w400,
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.8),
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: 1.0,
                         ),
                       ),
                       const SizedBox(height: 50),
 
                       // Loading Animation
-                      LoadingAnimationWidget.inkDrop(
+                      LoadingAnimationWidget.progressiveDots(
                         color: Colors.white,
-                        size: 50,
+                        size: 60,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Loading text
+                      Text(
+                        'Loading...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white.withOpacity(0.8),
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: 1.0,
+                        ),
                       ),
                     ],
                   ),

@@ -10,6 +10,7 @@ import '../webview/web_view_screen.dart';
 import '../../services/history_service.dart';
 import '../../services/tab_service.dart';
 import '../tabs/tab_manager_screen.dart';
+import '../../models/tab.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -203,7 +204,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const TabManagerScreen(),
+        builder: (context) => TabManagerScreen(
+          tabs: const <BrowserTab>[], // Empty tabs list for settings screen
+          onTabSelected: (index) {
+            // Handle tab selection if needed
+          },
+          onTabClosed: (index) {
+            // Handle tab closure if needed
+          },
+          onNewTab: () {
+            // Handle new tab creation if needed
+          },
+        ),
       ),
     ).then((_) => _loadTabCount());
   }

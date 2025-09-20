@@ -4,6 +4,7 @@ import '../../services/ad_block_service.dart';
 import '../../services/history_service.dart';
 import '../../services/tab_service.dart';
 import '../tabs/tab_manager_screen.dart';
+import '../../models/tab.dart';
 
 class WebViewScreen extends StatefulWidget {
   final String url;
@@ -284,7 +285,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const TabManagerScreen(),
+                      builder: (context) => TabManagerScreen(
+                        tabs: const <BrowserTab>[],
+                        onTabSelected: (index) {
+                          // Handle tab selection
+                        },
+                        onTabClosed: (index) {
+                          // Handle tab closure
+                        },
+                        onNewTab: () {
+                          // Handle new tab
+                        },
+                      ),
                     ),
                   );
                   break;

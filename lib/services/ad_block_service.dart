@@ -1,7 +1,7 @@
 import 'package:webview_flutter/webview_flutter.dart';
 
 class AdBlockService {
-  static bool _isEnabled = true;
+  static bool _isEnabled = false; // Default to disabled so ads show initially
   
   // Common ad domains and patterns
   static final List<String> _adDomains = [
