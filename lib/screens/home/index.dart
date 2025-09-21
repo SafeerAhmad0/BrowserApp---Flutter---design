@@ -692,6 +692,20 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchBarKey.currentState?.clearText();
   }
 
+  String _formatUrl(String url) {
+    // Remove https:// and www. for cleaner display
+    String formatted = url;
+    if (formatted.startsWith('https://')) {
+      formatted = formatted.substring(8);
+    } else if (formatted.startsWith('http://')) {
+      formatted = formatted.substring(7);
+    }
+    if (formatted.startsWith('www.')) {
+      formatted = formatted.substring(4);
+    }
+    return formatted;
+  }
+
   void _toggleDesktopMode() async {
     setState(() {
       _isDesktopMode = !_isDesktopMode;
@@ -1013,65 +1027,62 @@ class _HomeScreenState extends State<HomeScreen> {
               tooltip: 'Home',
             ),
 
-            // Search bar in the center - NEW TOP SEARCH BAR
+            // Current URL/Search bar display
             Expanded(
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 8),
-                child: TopSearchBar(
-                  key: _searchBarKey,
-                  hintText: 'Search Google or type a URL',
-                  onFocusChanged: (hasFocus) {
-                    setState(() {
-                      _isSearchFocused = hasFocus;
-                    });
-                  },
-                  onSearch: (query) {
-                    String url = query.toLowerCase();
-                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                      if (Uri.tryParse(url)?.hasScheme ?? false) {
-                        url = 'https://$url';
-                      } else {
-                        url = 'https://www.google.com/search?q=${Uri.encodeComponent(query)}';
-                      }
-                    }
-                    _addNewTab(url);
-                  },
-                ),
+                child: _isOnHomePage
+                  ? TopSearchBar(
+                      key: _searchBarKey,
+                      hintText: 'Search Google or type a URL',
+                      onFocusChanged: (hasFocus) {
+                        setState(() {
+                          _isSearchFocused = hasFocus;
+                        });
+                      },
+                      onSearch: (query) {
+                        String url = query.toLowerCase();
+                        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                          if (Uri.tryParse(url)?.hasScheme ?? false) {
+                            url = 'https://$url';
+                          } else {
+                            url = 'https://www.google.com/search?q=${Uri.encodeComponent(query)}';
+                          }
+                        }
+                        _addNewTab(url);
+                      },
+                    )
+                  : Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(left: 12),
+                            child: Icon(Icons.language, color: Color(0xFF2196F3), size: 18),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                _currentUrl.isNotEmpty ? _formatUrl(_currentUrl) : 'Loading...',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black87,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                      ),
+                    ),
               ),
-            ),
-
-            // Back button (only show when not on home page AND search not focused)
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: (!_isOnHomePage && !_isSearchFocused) ? 48 : 0,
-              child: (!_isOnHomePage && !_isSearchFocused)
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-                      onPressed: () async {
-                        if (_currentController != null && await _currentController!.canGoBack()) {
-                          await _currentController!.goBack();
-                        }
-                      },
-                      tooltip: 'Back',
-                    )
-                  : const SizedBox.shrink(),
-            ),
-
-            // Forward button (only show when not on home page AND search not focused)
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: (!_isOnHomePage && !_isSearchFocused) ? 48 : 0,
-              child: (!_isOnHomePage && !_isSearchFocused)
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_forward, color: Colors.white, size: 24),
-                      onPressed: () async {
-                        if (_currentController != null && await _currentController!.canGoForward()) {
-                          await _currentController!.goForward();
-                        }
-                      },
-                      tooltip: 'Forward',
-                    )
-                  : const SizedBox.shrink(),
             ),
 
             // Dynamic button (Clear Cache on home, New Tab on pages)
@@ -1135,6 +1146,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: _isOnHomePage ? _buildHomePage() : _buildWebViewPage(),
+      bottomNavigationBar: !_isOnHomePage ? _buildBottomNavigationBar() : null,
     );
   }
 
@@ -1422,6 +1434,85 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return WebViewWidget(controller: _currentController!);
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      height: 45,
+      decoration: BoxDecoration(
+        color: const Color(0xFF2196F3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            offset: const Offset(0, -1),
+            blurRadius: 4,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Back arrow
+          IconButton(
+            onPressed: () async {
+              if (_currentController != null && await _currentController!.canGoBack()) {
+                await _currentController!.goBack();
+              } else {
+                // Go to home page when no back history
+                _goHome();
+              }
+            },
+            icon: const Icon(
+              Icons.arrow_back_ios,
+              color: Colors.white,
+              size: 18,
+            ),
+            splashRadius: 20,
+            padding: const EdgeInsets.all(8),
+          ),
+
+          // Forward arrow
+          IconButton(
+            onPressed: () async {
+              if (_currentController != null && await _currentController!.canGoForward()) {
+                await _currentController!.goForward();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('❌ No forward page available'),
+                    duration: Duration(seconds: 1),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white,
+              size: 18,
+            ),
+            splashRadius: 20,
+            padding: const EdgeInsets.all(8),
+          ),
+
+          // Refresh button
+          IconButton(
+            onPressed: () {
+              if (_currentController != null) {
+                _currentController!.reload();
+              }
+            },
+            icon: const Icon(
+              Icons.refresh,
+              color: Colors.white,
+              size: 18,
+            ),
+            splashRadius: 20,
+            padding: const EdgeInsets.all(8),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildQuickAccessIcon(
