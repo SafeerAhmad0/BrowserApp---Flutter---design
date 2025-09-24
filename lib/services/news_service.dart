@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'language_preference_service.dart';
+import 'translation_service.dart';
 
 class NewsArticle {
   final String title;
@@ -13,6 +14,12 @@ class NewsArticle {
   final String? content;
   final NewsLanguage language;
 
+  // Translation fields
+  final String originalTitle;
+  final String originalDescription;
+  final String? originalContent;
+  final bool isTranslated;
+
   NewsArticle({
     required this.title,
     required this.description,
@@ -23,7 +30,14 @@ class NewsArticle {
     required this.publishedAt,
     this.content,
     required this.language,
-  });
+    String? originalTitle,
+    String? originalDescription,
+    String? originalContent,
+    this.isTranslated = false,
+  }) :
+    originalTitle = originalTitle ?? title,
+    originalDescription = originalDescription ?? description,
+    originalContent = originalContent ?? content;
 
   factory NewsArticle.fromJson(Map<String, dynamic> json, {NewsLanguage? language}) {
     return NewsArticle(
@@ -36,6 +50,74 @@ class NewsArticle {
       publishedAt: DateTime.tryParse(json['publishedAt'] ?? '') ?? DateTime.now(),
       content: json['content'],
       language: language ?? LanguagePreferenceService.currentLanguage,
+    );
+  }
+
+  /// Creates a translated copy of this article
+  Future<NewsArticle> translateTo(NewsLanguage targetLanguage) async {
+    if (targetLanguage == NewsLanguage.english || isTranslated) {
+      return this;
+    }
+
+    try {
+      print('🔄 Translating article: ${title.substring(0, 50)}...');
+
+      // Translate title, description, and content in batch
+      final textsToTranslate = [
+        title,
+        description,
+        if (content != null && content!.isNotEmpty) content!,
+      ];
+
+      final translations = await TranslationService.translateBatch(textsToTranslate, targetLanguage);
+
+      final translatedTitle = translations[0];
+      final translatedDescription = translations[1];
+      final translatedContent = translations.length > 2 ? translations[2] : content;
+
+      return NewsArticle(
+        title: translatedTitle,
+        description: translatedDescription,
+        url: url,
+        urlToImage: urlToImage,
+        source: source,
+        author: author,
+        publishedAt: publishedAt,
+        content: translatedContent,
+        language: targetLanguage,
+        originalTitle: originalTitle,
+        originalDescription: originalDescription,
+        originalContent: originalContent,
+        isTranslated: true,
+      );
+    } catch (e) {
+      print('❌ Translation failed for article: $e');
+      return this; // Return original article on failure
+    }
+  }
+
+  /// Creates a copy with updated translation status
+  NewsArticle copyWith({
+    String? title,
+    String? description,
+    String? content,
+    NewsLanguage? language,
+    bool? isTranslated,
+  }) {
+    return NewsArticle(
+      title: title ?? this.title,
+      description: description ?? this.description,
+      url: url,
+      urlToImage: urlToImage,
+      source: source,
+      author: author,
+      publishedAt: publishedAt,
+      content: content ?? this.content,
+      language: language ?? this.language,
+      originalTitle: originalTitle,
+      originalDescription: originalDescription,
+      originalContent: originalContent,
+      isTranslated: isTranslated ?? this.isTranslated,
     );
   }
 }
@@ -51,6 +133,31 @@ class NewsService {
   static Future<List<NewsArticle>> getTopHeadlines() async {
     final language = LanguagePreferenceService.currentLanguage;
     return getTopHeadlinesForLanguage(language);
+  }
+
+  /// Gets top headlines and translates them if needed
+  static Future<List<NewsArticle>> getTranslatedTopHeadlines() async {
+    final targetLanguage = LanguagePreferenceService.currentLanguage;
+
+    // Get English news first (most reliable source)
+    final englishArticles = await getTopHeadlinesForLanguage(NewsLanguage.english);
+
+    if (targetLanguage == NewsLanguage.english) {
+      return englishArticles;
+    }
+
+    // Preload common translations for better performance
+    await TranslationService.preloadCommonTranslations(targetLanguage);
+
+    // Translate articles
+    final translatedArticles = <NewsArticle>[];
+    for (final article in englishArticles) {
+      final translated = await article.translateTo(targetLanguage);
+      translatedArticles.add(translated);
+    }
+
+    print('✅ Translated ${translatedArticles.length} articles to ${targetLanguage.displayName}');
+    return translatedArticles;
   }
 
   static Future<List<NewsArticle>> getTopHeadlinesForLanguage(NewsLanguage language) async {
@@ -81,8 +188,15 @@ class NewsService {
   }
 
   static Future<List<NewsArticle>> getAllNews() async {
+    return getTranslatedAllNews();
+  }
+
+  /// Gets all news and translates them if needed
+  static Future<List<NewsArticle>> getTranslatedAllNews() async {
+    final targetLanguage = LanguagePreferenceService.currentLanguage;
+
     try {
-      // Get more comprehensive news
+      // Get more comprehensive news from English source
       final response = await http.get(
         Uri.parse('$_baseUrl/top-headlines?country=us&pageSize=50&apiKey=$_apiKey'),
         headers: {'Content-Type': 'application/json'},
@@ -92,9 +206,22 @@ class NewsService {
         final data = json.decode(response.body);
         if (data['status'] == 'ok') {
           final articles = data['articles'] as List;
-          return articles.map<NewsArticle>((article) {
-            return NewsArticle.fromJson(article);
+          final englishArticles = articles.map<NewsArticle>((article) {
+            return NewsArticle.fromJson(article, language: NewsLanguage.english);
           }).toList();
+
+          if (targetLanguage == NewsLanguage.english) {
+            return englishArticles;
+          }
+
+          // Translate articles
+          final translatedArticles = <NewsArticle>[];
+          for (final article in englishArticles) {
+            final translated = await article.translateTo(targetLanguage);
+            translatedArticles.add(translated);
+          }
+
+          return translatedArticles;
         } else {
           throw Exception('API Error: ${data['message'] ?? 'Unknown error'}');
         }
@@ -103,7 +230,7 @@ class NewsService {
       }
     } catch (e) {
       print('Error fetching all news: $e');
-      return _getFallbackNews();
+      return _getFallbackNewsForLanguage(targetLanguage);
     }
   }
 

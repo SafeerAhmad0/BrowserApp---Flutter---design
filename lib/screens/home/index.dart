@@ -11,6 +11,7 @@ import '../../components/auth_dialog.dart';
 import '../../services/auth_service.dart';
 import '../../services/language_service.dart';
 import '../../services/language_preference_service.dart';
+import '../../services/translation_service.dart';
 import '../settings/settings_screen.dart';
 import '../settings/browsing_history_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -22,6 +23,7 @@ import '../../services/history_service.dart';
 import '../tabs/tab_manager_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../models/tab.dart';
+import '../../components/native_ad_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,158 +32,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class AdSlot extends StatelessWidget {
-  final String title;
-  final String? imageUrl;
-  final VoidCallback? onTap;
-
-  const AdSlot({
-    super.key,
-    required this.title,
-    this.imageUrl,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
-        margin: const EdgeInsets.symmetric(
-          horizontal: 16.0,
-          vertical: 8.0,
-        ),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.yellow.shade100,
-              Colors.orange.shade100,
-              Colors.red.shade50,
-            ],
-          ),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: Colors.red.shade300,
-            width: 3,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.red.withOpacity(0.3),
-              offset: const Offset(0, 4),
-              blurRadius: 12,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (imageUrl != null)
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(15.0),
-                ),
-                child: Container(
-                  height: 150,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.red.shade200,
-                        Colors.orange.shade200,
-                      ],
-                    ),
-                  ),
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.campaign,
-                          size: 50,
-                          color: Colors.red,
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          '🎯 ADVERTISEMENT 🎯',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade600,
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.red.withOpacity(0.3),
-                          offset: const Offset(0, 2),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: const Text(
-                      '🟢 SPONSORED AD',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16.0,
-                      color: Color(0xFF1976D2),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    '🎯 Your ad network content will appear here - Perfect spot for native advertising!',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 14.0,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _HomeScreenState extends State<HomeScreen> {
   List<NewsArticle> _newsArticles = [];
   bool _isLoadingNews = true;
   bool _isLoadingMoreNews = false;
+  bool _isTranslating = false;
+  String _translationStatus = '';
   bool _isAdmin = false;
   final AuthService _authService = AuthService();
   final List<BrowserTab> _tabs = [];
@@ -239,21 +96,63 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadNews() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingNews = true;
+      _isTranslating = false;
+      _translationStatus = '';
+    });
+
     try {
-      final articles = await NewsService.getTopHeadlines();
+      final targetLanguage = LanguagePreferenceService.currentLanguage;
+
+      if (targetLanguage != NewsLanguage.english) {
+        setState(() {
+          _isTranslating = true;
+          _translationStatus = 'Loading news for translation...';
+        });
+      }
+
+      // Use the new translated news service
+      final articles = await NewsService.getTranslatedTopHeadlines();
+
       if (mounted) {
         setState(() {
           _newsArticles = articles;
           _isLoadingNews = false;
+          _isTranslating = false;
+          _translationStatus = '';
           _currentPage = 1;
         });
+
+        // Show success message if translated
+        if (targetLanguage != NewsLanguage.english && articles.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ News translated to ${targetLanguage.displayName}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('Error loading news: $e');
       if (mounted) {
         setState(() {
           _isLoadingNews = false;
+          _isTranslating = false;
+          _translationStatus = '';
         });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Failed to load news: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
   }
@@ -266,36 +165,61 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // Simulate loading more news from different categories
-      List<NewsArticle> moreArticles = [];
+      final targetLanguage = LanguagePreferenceService.currentLanguage;
+
+      // Get more English news from different categories
+      List<NewsArticle> englishArticles = [];
 
       switch (_currentPage % 6) {
         case 1:
-          moreArticles = await NewsService.getTechNews();
+          englishArticles = await NewsService.getTechNews();
           break;
         case 2:
-          moreArticles = await NewsService.getBusinessNews();
+          englishArticles = await NewsService.getBusinessNews();
           break;
         case 3:
-          moreArticles = await NewsService.getSportsNews();
+          englishArticles = await NewsService.getSportsNews();
           break;
         case 4:
-          moreArticles = await NewsService.getHealthNews();
+          englishArticles = await NewsService.getHealthNews();
           break;
         case 5:
-          moreArticles = await NewsService.getScienceNews();
+          englishArticles = await NewsService.getScienceNews();
           break;
         case 0:
-          moreArticles = await NewsService.getEntertainmentNews();
+          englishArticles = await NewsService.getEntertainmentNews();
           break;
+      }
+
+      // Translate if needed
+      List<NewsArticle> finalArticles = [];
+      if (targetLanguage == NewsLanguage.english) {
+        finalArticles = englishArticles;
+      } else {
+        // Translate each article
+        for (final article in englishArticles) {
+          final translated = await article.translateTo(targetLanguage);
+          finalArticles.add(translated);
+        }
       }
 
       if (mounted) {
         setState(() {
-          _newsArticles.addAll(moreArticles);
+          _newsArticles.addAll(finalArticles);
           _currentPage++;
           _isLoadingMoreNews = false;
         });
+
+        // Show success message if translated
+        if (targetLanguage != NewsLanguage.english && finalArticles.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ ${finalArticles.length} more articles translated to ${targetLanguage.displayName}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('Error loading more news: $e');
@@ -303,6 +227,14 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isLoadingMoreNews = false;
         });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Failed to load more news: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     }
   }
@@ -1367,12 +1299,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                       DropdownButton<NewsLanguage>(
                         value: LanguagePreferenceService.currentLanguage,
-                        onChanged: (NewsLanguage? newLanguage) async {
-                          if (newLanguage != null) {
+                        onChanged: _isTranslating ? null : (NewsLanguage? newLanguage) async {
+                          if (newLanguage != null && newLanguage != LanguagePreferenceService.currentLanguage) {
                             await LanguagePreferenceService.setLanguagePreference(newLanguage);
+
+                            // Show loading immediately
                             setState(() {
                               _isLoadingNews = true;
+                              _isTranslating = newLanguage != NewsLanguage.english;
+                              _translationStatus = newLanguage != NewsLanguage.english
+                                ? 'Switching to ${newLanguage.displayName}...'
+                                : '';
                             });
+
                             await _loadNews();
                           }
                         },
@@ -1446,9 +1385,45 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _isLoadingNews
                   ? Container(
                       height: 300,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF2196F3),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const CircularProgressIndicator(
+                              color: Color(0xFF2196F3),
+                              strokeWidth: 3,
+                            ),
+                            const SizedBox(height: 16),
+                            if (_isTranslating && _translationStatus.isNotEmpty)
+                              Column(
+                                children: [
+                                  Text(
+                                    _translationStatus,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '🌐 Translating news content...',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              Text(
+                                'Loading latest news...',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     )
@@ -1646,20 +1621,11 @@ class _HomeScreenState extends State<HomeScreen> {
         newsIndex++;
       }
 
-      // Add ad slot after every group
+      // Add real ad after every group
       if (newsIndex < _newsArticles.length) {
-        items.add(AdSlot(
-          title: 'Advertisement ${adCounter + 1}',
-          imageUrl: 'placeholder',
-          onTap: () {
-            // TODO: Handle ad click
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Ad clicked! (Placeholder)'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
+        items.add(NativeAdWidget(
+          adId: adCounter,
+          height: 180,
         ));
         adCounter++;
       }
@@ -1743,23 +1709,63 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2196F3).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          article.source,
-                          style: const TextStyle(
-                            color: Color(0xFF1976D2),
-                            fontSize: 11.0,
-                            fontWeight: FontWeight.w600,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2196F3).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              article.source,
+                              style: const TextStyle(
+                                color: Color(0xFF1976D2),
+                                fontSize: 11.0,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (article.isTranslated) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.green.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.translate,
+                                    size: 10,
+                                    color: Colors.green[700],
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    article.language.displayName,
+                                    style: TextStyle(
+                                      color: Colors.green[700],
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Flexible(
                         child: Text(
