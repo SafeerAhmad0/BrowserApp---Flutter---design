@@ -16,7 +16,8 @@
       "Bash(find:*)",
       "Bash(q)",
       "Bash(C:Userssafeedevflutterbinflutter.bat analyze)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

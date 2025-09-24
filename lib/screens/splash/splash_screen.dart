@@ -124,8 +124,6 @@ class _SplashScreenState extends State<SplashScreen>
                         textAlign: TextAlign.center,
                         text: const TextSpan(
                           style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
                             color: Colors.white,
                             shadows: [
                               Shadow(
@@ -136,51 +134,21 @@ class _SplashScreenState extends State<SplashScreen>
                             ],
                           ),
                           children: [
-                            TextSpan(text: 'Blue'),
+                            TextSpan(
+                              text: 'Blue',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             TextSpan(
                               text: 'X',
                               style: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 42,
+                                fontWeight: FontWeight.w300,
                               ),
                             ),
-                            TextSpan(text: ' Browser'),
                           ],
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-
-                      // Subtitle with new description
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 40),
-                        child: Text(
-                          'Safe, Secure & Proxy Ad Block',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white.withOpacity(0.95),
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.5,
-                            shadows: [
-                              Shadow(
-                                offset: const Offset(0, 1),
-                                blurRadius: 2,
-                                color: Colors.black.withOpacity(0.3),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Additional features text
-                      Text(
-                        'Fast • Private • Secure',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.8),
-                          fontWeight: FontWeight.w300,
-                          letterSpacing: 1.0,
                         ),
                       ),
                       const SizedBox(height: 50),
@@ -190,11 +158,12 @@ class _SplashScreenState extends State<SplashScreen>
                         color: Colors.white,
                         size: 60,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 15),
 
-                      // Loading text
+                      // Loading text - centered below animation
                       Text(
                         'Loading...',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.white.withOpacity(0.8),

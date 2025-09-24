@@ -10,6 +10,7 @@ import '../admin/admin_panel.dart';
 import '../../components/auth_dialog.dart';
 import '../../services/auth_service.dart';
 import '../../services/language_service.dart';
+import '../../services/language_preference_service.dart';
 import '../settings/settings_screen.dart';
 import '../settings/browsing_history_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -198,12 +199,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeLanguageService();
     _loadNews();
     _checkAdminStatus();
     _setupScrollListener();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showNotificationsSlideshow();
     });
+  }
+
+  Future<void> _initializeLanguageService() async {
+    await LanguagePreferenceService.loadLanguagePreference();
   }
 
   @override
@@ -1169,16 +1175,13 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // BlueX Header with Google-like styling and italic X
+            // BlueX Header with new styling - Blue bold & small, X thin & big
             Container(
-              margin: const EdgeInsets.symmetric(vertical: 40),
+              margin: const EdgeInsets.symmetric(vertical: 20),
               child: RichText(
                 text: const TextSpan(
                   style: TextStyle(
-                    fontSize: 72,
-                    fontWeight: FontWeight.w300,
                     color: Colors.white,
-                    letterSpacing: -2,
                     shadows: [
                       Shadow(
                         offset: Offset(2, 2),
@@ -1188,12 +1191,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   children: [
-                    TextSpan(text: 'Blue'),
+                    TextSpan(
+                      text: 'Blue',
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -1,
+                      ),
+                    ),
                     TextSpan(
                       text: 'X',
                       style: TextStyle(
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w400,
+                        fontSize: 72,
+                        fontWeight: FontWeight.w300,
+                        letterSpacing: -2,
                       ),
                     ),
                   ],
@@ -1247,7 +1258,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               child: SizedBox(
-                height: 80,
+                height: 90,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
@@ -1337,38 +1348,89 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  const Text(
-                    "📰 Latest News",
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1976D2),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AllNewsScreen(),
+                  // Language Selector Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.language, color: Color(0xFF2196F3), size: 18),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'News Language:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey,
                         ),
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFF2196F3),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                      const SizedBox(width: 8),
+                      DropdownButton<NewsLanguage>(
+                        value: LanguagePreferenceService.currentLanguage,
+                        onChanged: (NewsLanguage? newLanguage) async {
+                          if (newLanguage != null) {
+                            await LanguagePreferenceService.setLanguagePreference(newLanguage);
+                            setState(() {
+                              _isLoadingNews = true;
+                            });
+                            await _loadNews();
+                          }
+                        },
+                        items: LanguagePreferenceService.availableLanguages.map((language) {
+                          return DropdownMenuItem<NewsLanguage>(
+                            value: language,
+                            child: Text(
+                              language.displayName,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          );
+                        }).toList(),
+                        underline: Container(),
+                        style: const TextStyle(
+                          color: Color(0xFF2196F3),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                    child: const Text("View All"),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // News Header Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "📰 Latest News",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1976D2),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AllNewsScreen(),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFF2196F3),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        child: const Text("View All"),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1523,43 +1585,48 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     return InkWell(
       onTap: () => _addNewTab(url),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color.withOpacity(0.2),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              offset: const Offset(0, 2),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24, color: color),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        children: [
+          // Chrome-style circular icon container
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: color.withOpacity(0.3),
+                width: 1.5,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.2),
+                  offset: const Offset(0, 2),
+                  blurRadius: 8,
+                ),
+              ],
             ),
-          ],
-        ),
+            child: Icon(
+              icon,
+              size: 28,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Title below icon
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[800],
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

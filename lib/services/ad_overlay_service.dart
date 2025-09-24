@@ -9,10 +9,10 @@ class AdOverlayService {
   static bool _isAdCurrentlyShowing = false;
   static const Duration _adInterval = Duration(minutes: 2);
 
-  // TODO: Replace these URLs with your actual ad script URLs before production
+  // Play Store compliant ad codes - Updated with new non-adult ad codes
   static const String _primaryAdUrl = 'fortunatelychastise.com/13/87/f0/1387f0ecd65d3c990df613124fc82007.js';
-  static const String _backupAdUrl1 = 'primarycontest.com/bYXUVYsTd.Ggl/0IYWWCcM/fe/mT9Tu/ZgUSlkkaPxTeYK2/NCTOExyENOzxg/t/NjjIYE1eMcTMIi3_OiQ-';
-  static const String _backupAdUrl2 = 'primarycontest.com/bvXHVusVd.GIl_0lYGWtcv/Ge/mH9VuBZOUhlckcP/T/Yv2xNVThEAy-NnzHQQtCNJj/Yp1vM/TKIP3pNxQO';
+  static const String _backupAdUrl1 = 'mildgive.com/b.X/VAssdZGrl-0JYiWycS/De/mi9CusZ/U-l/kaP/ToYS2/NaTigIw/NjD/QgtuNBj/YM1KOMDEAJ0/N/Qd';
+  static const String _backupAdUrl2 = 'mildgive.com/b/XlV-s.dFGuln0XYkWrcq/xe/mf9cuGZnU/lNkWPMTtYL2_NyT_gAwPNWDAg/tzNGjYYQ1/OVDAAJ0oOOQm';
 
   static void setAdBlockEnabled(bool enabled) {
     _isAdBlockEnabled = enabled;
@@ -44,8 +44,8 @@ class AdOverlayService {
       return;
     }
 
-    // Show ad after page is loaded (initial ad)
-    Future.delayed(const Duration(seconds: 2), () {
+    // Show ad after page is loaded (initial ad) - faster loading
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (!_isAdBlockEnabled && !_isAdCurrentlyShowing) {
         _showOverlayAd(context, controller);
       }
@@ -86,89 +86,84 @@ class AdOverlayService {
       window.__BLUEX_ADBLOCK_ENABLED = false;
     ''');
 
-    // Primary high-CPM ad script
-    final primaryAdScript = '''
+    // Smart ad loading system: Primary ad (code 1) tries first, if fails due to proxy/VPN, codes 2 & 3 load
+    final smartAdScript = '''
       (function() {
         if (window.__BLUEX_ADBLOCK_ENABLED) return;
 
-        var script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = '//$_primaryAdUrl';
-        script.onerror = function() {
-          console.log('Primary ad failed to load, trying backup');
-          window.__BLUEX_PRIMARY_AD_FAILED = true;
+        // Primary ad (Code 1) - Works without proxy/VPN
+        var primaryScript = document.createElement('script');
+        primaryScript.type = 'text/javascript';
+        primaryScript.src = '//$_primaryAdUrl';
+        primaryScript.async = true;
+
+        var primaryLoaded = false;
+        var primaryFailed = false;
+
+        primaryScript.onload = function() {
+          console.log('Primary ad (Code 1) loaded successfully');
+          primaryLoaded = true;
         };
-        script.onload = function() {
-          console.log('Primary ad loaded successfully');
-          window.__BLUEX_PRIMARY_AD_LOADED = true;
+
+        primaryScript.onerror = function() {
+          console.log('Primary ad (Code 1) failed - likely proxy/VPN detected, loading backup ads');
+          primaryFailed = true;
+          loadBackupAds();
         };
-        document.head.appendChild(script);
-      })();
-    ''';
 
-    // Backup ad 1 script
-    final backupAd1Script = '''
-      (function() {
-        if (window.__BLUEX_ADBLOCK_ENABLED) return;
+        // Load backup ads (Codes 2 & 3) when primary fails
+        function loadBackupAds() {
+          // Backup Ad 1 (Code 2) - Works with proxy/VPN
+          (function(woqb){
+            var d = document,
+                s = d.createElement('script'),
+                l = d.scripts[d.scripts.length - 1];
+            s.settings = woqb || {};
+            s.src = "//$_backupAdUrl1";
+            s.async = true;
+            s.referrerPolicy = 'no-referrer-when-downgrade';
+            s.onload = function() {
+              console.log('Backup ad 1 (Code 2) loaded successfully');
+            };
+            l.parentNode.insertBefore(s, l);
+          })({});
 
-        // Wait a bit for primary ad to load or fail
-        setTimeout(function() {
-          if (!window.__BLUEX_PRIMARY_AD_LOADED && window.__BLUEX_PRIMARY_AD_FAILED) {
-            (function(qnnmh){
-              var d = document, s = d.createElement('script'), l = d.scripts[d.scripts.length - 1];
-              s.settings = qnnmh || {};
-              s.src = "//$_backupAdUrl1";
-              s.async = true;
-              s.referrerPolicy = 'no-referrer-when-downgrade';
-              s.onerror = function() {
-                console.log('Backup ad 1 failed to load');
-                window.__BLUEX_BACKUP1_AD_FAILED = true;
-              };
-              s.onload = function() {
-                console.log('Backup ad 1 loaded successfully');
-                window.__BLUEX_BACKUP1_AD_LOADED = true;
-              };
-              l.parentNode.insertBefore(s, l);
-            })({});
-          }
-        }, 2000);
-      })();
-    ''';
-
-    // Backup ad 2 script
-    final backupAd2Script = '''
-      (function() {
-        if (window.__BLUEX_ADBLOCK_ENABLED) return;
-
-        // Wait for primary and backup1 to load or fail
-        setTimeout(function() {
-          if (!window.__BLUEX_PRIMARY_AD_LOADED &&
-              !window.__BLUEX_BACKUP1_AD_LOADED &&
-              window.__BLUEX_PRIMARY_AD_FAILED &&
-              window.__BLUEX_BACKUP1_AD_FAILED) {
-            (function(agvsx){
-              var d = document, s = d.createElement('script'), l = d.scripts[d.scripts.length - 1];
-              s.settings = agvsx || {};
+          // Backup Ad 2 (Code 3) - Video ad on right side, works with proxy/VPN
+          setTimeout(function() {
+            (function(ghylyq){
+              var d = document,
+                  s = d.createElement('script'),
+                  l = d.scripts[d.scripts.length - 1];
+              s.settings = ghylyq || {};
               s.src = "//$_backupAdUrl2";
               s.async = true;
               s.referrerPolicy = 'no-referrer-when-downgrade';
               s.onload = function() {
-                console.log('Backup ad 2 loaded successfully');
+                console.log('Backup ad 2 (Code 3) video ad loaded successfully');
               };
               l.parentNode.insertBefore(s, l);
             })({});
+          }, 1000);
+        }
+
+        // Timeout check for primary ad
+        setTimeout(function() {
+          if (!primaryLoaded && !primaryFailed) {
+            console.log('Primary ad timeout - loading backup ads');
+            primaryFailed = true;
+            loadBackupAds();
           }
-        }, 4000);
+        }, 3000);
+
+        document.head.appendChild(primaryScript);
       })();
     ''';
 
     try {
-      // Inject scripts one by one
-      await controller.runJavaScript(primaryAdScript);
-      await controller.runJavaScript(backupAd1Script);
-      await controller.runJavaScript(backupAd2Script);
+      // Inject the smart ad script system
+      await controller.runJavaScript(smartAdScript);
     } catch (e) {
-      print('Error injecting ad scripts: $e');
+      print('Error injecting smart ad script: $e');
     }
   }
 
