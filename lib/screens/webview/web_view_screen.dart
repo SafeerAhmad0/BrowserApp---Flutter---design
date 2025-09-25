@@ -71,11 +71,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
       // Stop any ongoing processes
       _controller.runJavaScript('window.stop();').catchError((e) {
-        print('Error stopping page: $e');
       });
 
     } catch (e) {
-      print('Error during cleanup: $e');
     }
     super.dispose();
   }
@@ -112,7 +110,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     title = pageTitle;
                   }
                 } catch (e) {
-                  print('Could not get page title: $e');
                 }
 
                 await HistoryService.addToHistory(
@@ -125,7 +122,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   await TabService.updateTab(_currentTabId!, url: url, title: title);
                 }
               } catch (e) {
-                print('Error adding to history: $e');
               }
 
               // Apply ad blocking OR ad injection
@@ -133,7 +129,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 try {
                   await AdBlockService.injectAdBlocker(_controller);
                 } catch (e) {
-                  print('Ad block injection failed: $e');
                 }
               } else {
                 // Inject ads when ad block is disabled
@@ -142,7 +137,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   AdOverlayService.showInitialAd(context, _controller);
                   AdOverlayService.startAdTimer(context, _controller);
                 } catch (e) {
-                  print('Ad injection failed: $e');
                 }
               }
 
@@ -162,13 +156,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     }
                   ''');
                 } catch (e) {
-                  print('Performance optimization failed: $e');
                 }
               }
             }
           },
           onWebResourceError: (WebResourceError error) {
-            print('WebView error: ${error.description}');
             if (mounted) {
               setState(() {
                 _isLoading = false;
@@ -176,7 +168,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
             }
           },
           onHttpError: (HttpResponseError error) {
-            print('HTTP error: ${error.response?.statusCode}');
             if (mounted) {
               setState(() {
                 _isLoading = false;
@@ -185,7 +176,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
           },
           onNavigationRequest: (NavigationRequest request) {
             // Allow all navigation for Google Translate to work properly
-            print('Navigation to: ${request.url}');
             return NavigationDecision.navigate;
           },
         ),
@@ -222,7 +212,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
         );
       }
     } catch (e) {
-      print('Error toggling desktop mode: $e');
       // Revert the state if failed
       if (mounted) {
         setState(() {
@@ -340,7 +329,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
         translateDiv.style.display = 'none';
         document.body.appendChild(translateDiv);
 
-        console.log('Google Translate initialized for ${targetLanguage.displayName}');
       ''');
 
       ScaffoldMessenger.of(context).showSnackBar(

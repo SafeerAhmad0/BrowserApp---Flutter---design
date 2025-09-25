@@ -38,7 +38,6 @@ class _BrowsingHistoryScreenState extends State<BrowsingHistoryScreen> {
         });
       }
     } catch (e) {
-      print('Error loading history: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

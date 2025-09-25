@@ -69,7 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Listen to auth state changes to update admin status
     _authService.authStateChanges.listen((user) {
-      print('🔴 ADMIN DEBUG: Auth state changed - User: ${user?.email}');
       _checkAdminStatus();
     });
 
@@ -107,22 +106,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _isAdmin = isAdminNow;
     });
 
-    print('🔴 ADMIN DEBUG: ========== ADMIN STATUS CHECK ==========');
-    print('🔴 ADMIN DEBUG: Was admin: $wasAdmin');
-    print('🔴 ADMIN DEBUG: Is admin now: $_isAdmin');
-    print('🔴 ADMIN DEBUG: Current user: ${user?.email}');
-    print('🔴 ADMIN DEBUG: Expected admin email: admin@app.com');
-    print('🔴 ADMIN DEBUG: Email matches: ${user?.email == "admin@app.com"}');
-    print('🔴 ADMIN DEBUG: AuthService.isAdmin result: $isAdminNow');
-    print('🔴 ADMIN DEBUG: ==========================================');
   }
 
   Future<void> _loadAdminCards() async {
     try {
       await AdminCardService.loadAdminCards();
-      print('🟢 ADMIN CARDS: Successfully loaded ${AdminCardService.adminCards.length} cards');
     } catch (e) {
-      print('🔴 ADMIN CARDS ERROR: Failed to load admin cards: $e');
     }
   }
 
@@ -169,7 +158,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
-      print('Error loading news: $e');
       if (mounted) {
         setState(() {
           _isLoadingNews = false;
@@ -253,7 +241,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
-      print('Error loading more news: $e');
       if (mounted) {
         setState(() {
           _isLoadingMoreNews = false;
@@ -608,9 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 url: tabUrl,
                 title: title ?? 'Untitled',
               );
-              print('📚 HISTORY DEBUG: Added to history - $title ($tabUrl)');
             } catch (e) {
-              print('📚 HISTORY ERROR: Failed to add to history - $e');
             }
 
             setState(() {
@@ -625,11 +610,8 @@ class _HomeScreenState extends State<HomeScreen> {
             });
 
             // Debug info
-            print('🔴 HOME DEBUG: Page finished loading: $tabUrl');
-            print('🔴 HOME DEBUG: AdBlockService.isEnabled = ${AdBlockService.isEnabled}');
           },
           onWebResourceError: (WebResourceError error) {
-            print('WebView error: $error');
           },
         ),
       )
@@ -703,7 +685,6 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
       } catch (e) {
-        print('Error toggling desktop mode: $e');
         // Revert the state if failed
         if (mounted) {
           setState(() {
@@ -1089,13 +1070,10 @@ class _HomeScreenState extends State<HomeScreen> {
               trailing: Switch(
                 value: AdBlockService.isEnabled,
                 onChanged: (value) {
-                  print('🔴 TOGGLE DEBUG: Ad Block toggle changed to: $value');
                   setState(() {
                     AdBlockService.setEnabled(value);
                     AdOverlayService.setAdBlockEnabled(value);
                   });
-                  print('🔴 TOGGLE DEBUG: AdBlockService.isEnabled = ${AdBlockService.isEnabled}');
-                  print('🔴 TOGGLE DEBUG: AdOverlayService.isAdBlockEnabled = ${AdOverlayService.isAdBlockEnabled}');
 
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1128,7 +1106,6 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: const Icon(Icons.history, color: Color(0xFF2196F3)),
               title: const Text('View Browsing History'),
               onTap: () {
-                print('🔍 DEBUG: View History clicked');
                 Navigator.pop(context);
                 Navigator.push(
                   context,
@@ -1136,7 +1113,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context) => const BrowsingHistoryScreen(),
                   ),
                 ).then((_) {
-                  print('🔍 DEBUG: Returned from history screen');
                 });
               },
             ),
@@ -1899,7 +1875,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       height: 28,
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
-                        print('Error loading image $assetPath: $error');
                         return Icon(
                           Icons.image,
                           size: 24,

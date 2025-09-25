@@ -80,7 +80,6 @@ class _MyAppState extends State<MyApp> {
       // Add any other initialization here
       await Future.delayed(const Duration(seconds: 2)); // Minimum display time for loader
     } catch (e) {
-      print('Error loading .env file: $e');
       // Continue without .env file
     }
   }

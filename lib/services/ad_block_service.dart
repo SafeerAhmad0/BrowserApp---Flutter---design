@@ -123,7 +123,6 @@ class AdBlockService {
       
       Node.prototype.appendChild = function(element) {
         if (isBlocked(element)) {
-          console.log('AdBlock: Blocked', element.src || element.href);
           return element;
         }
         return originalAppendChild.call(this, element);
@@ -131,7 +130,6 @@ class AdBlockService {
       
       Node.prototype.insertBefore = function(element, referenceNode) {
         if (isBlocked(element)) {
-          console.log('AdBlock: Blocked', element.src || element.href);
           return element;
         }
         return originalInsertBefore.call(this, element, referenceNode);
@@ -272,7 +270,6 @@ class AdBlockService {
       // Inject JavaScript to block ads
       await controller.runJavaScript(_adBlockJS);
     } catch (e) {
-      print('AdBlock: Error injecting scripts: \$e');
     }
   }
   
@@ -280,7 +277,6 @@ class AdBlockService {
     if (!_isEnabled) return NavigationDecision.navigate;
     
     if (shouldBlockUrl(request.url)) {
-      print('AdBlock: Blocked navigation to ${request.url}');
       return NavigationDecision.prevent;
     }
     

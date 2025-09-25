@@ -85,7 +85,6 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
         <div class="loading">Loading ad...</div>
     </div>
     <script>
-        console.log('Ad container initialized for zone ${widget.adId}');
 
         // Remove loading text after 5 seconds if no ad loads
         setTimeout(function() {
@@ -105,20 +104,18 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
     switch (widget.adId % 3) {
       case 0:
         return '''
-        console.log('Loading primary ad script for zone ${widget.adId}');
         (function() {
           var script = document.createElement('script');
           script.type = 'text/javascript';
           script.src = 'https://$_primaryAdCode';
           script.async = true;
-          script.onload = function() { console.log('Primary ad script loaded'); };
-          script.onerror = function() { console.log('Primary ad script failed to load'); };
+          script.onload = function() { };
+          script.onerror = function() { };
           document.head.appendChild(script);
         })();
         ''';
       case 1:
         return '''
-        console.log('Loading backup ad script 1 for zone ${widget.adId}');
         (function(woqb){
           var d = document,
               s = d.createElement('script'),
@@ -127,14 +124,13 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
           s.src = "https://$_backupAdCode1";
           s.async = true;
           s.referrerPolicy = 'no-referrer-when-downgrade';
-          s.onload = function() { console.log('Backup ad script 1 loaded'); };
-          s.onerror = function() { console.log('Backup ad script 1 failed to load'); };
+          s.onload = function() { };
+          s.onerror = function() { };
           l.parentNode.insertBefore(s, l);
         })({});
         ''';
       default:
         return '''
-        console.log('Loading backup ad script 2 for zone ${widget.adId}');
         (function(ghylyq){
           var d = document,
               s = d.createElement('script'),
@@ -143,8 +139,8 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
           s.src = "https://$_backupAdCode2";
           s.async = true;
           s.referrerPolicy = 'no-referrer-when-downgrade';
-          s.onload = function() { console.log('Backup ad script 2 loaded'); };
-          s.onerror = function() { console.log('Backup ad script 2 failed to load'); };
+          s.onload = function() { };
+          s.onerror = function() { };
           l.parentNode.insertBefore(s, l);
         })({});
         ''';

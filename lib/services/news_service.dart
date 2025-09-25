@@ -60,7 +60,6 @@ class NewsArticle {
     }
 
     try {
-      print('🔄 Translating article: ${title.substring(0, 50)}...');
 
       // Translate title, description, and content in batch
       final textsToTranslate = [
@@ -91,7 +90,6 @@ class NewsArticle {
         isTranslated: true,
       );
     } catch (e) {
-      print('❌ Translation failed for article: $e');
       return this; // Return original article on failure
     }
   }
@@ -156,7 +154,6 @@ class NewsService {
       translatedArticles.add(translated);
     }
 
-    print('✅ Translated ${translatedArticles.length} articles to ${targetLanguage.displayName}');
     return translatedArticles;
   }
 
@@ -182,7 +179,6 @@ class NewsService {
         throw Exception('Failed to load news: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching top headlines for ${language.displayName}: $e');
       return _getFallbackNewsForLanguage(language);
     }
   }
@@ -229,7 +225,6 @@ class NewsService {
         throw Exception('Failed to load news: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching all news: $e');
       return _getFallbackNewsForLanguage(targetLanguage);
     }
   }
@@ -256,7 +251,6 @@ class NewsService {
         throw Exception('Failed to load tech news: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching tech news: $e');
       return _getFallbackTechNews();
     }
   }
@@ -288,7 +282,6 @@ class NewsService {
         throw Exception('Failed to load business news: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching business news: $e');
       return _getFallbackBusinessNews();
     }
   }
@@ -307,7 +300,6 @@ class NewsService {
         throw Exception('Failed to load sports news: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching sports news: $e');
       return _getFallbackSportsNews();
     }
   }
@@ -326,7 +318,6 @@ class NewsService {
         throw Exception('Failed to load health news: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching health news: $e');
       return _getFallbackHealthNews();
     }
   }
@@ -345,7 +336,6 @@ class NewsService {
         throw Exception('Failed to load science news: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching science news: $e');
       return _getFallbackScienceNews();
     }
   }
@@ -364,7 +354,6 @@ class NewsService {
         throw Exception('Failed to load entertainment news: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching entertainment news: $e');
       return _getFallbackEntertainmentNews();
     }
   }

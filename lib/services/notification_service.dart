@@ -116,7 +116,6 @@ class NotificationService {
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       // Get FCM token
       String? token = await _firebaseMessaging.getToken();
-      print('FCM Token: $token');
 
       // Save the request date
       await prefs.setString('last_notification_request', now);
@@ -202,21 +201,17 @@ class NotificationService {
 
   static void _handleNotificationTap(RemoteMessage message) {
     // Handle notification tap logic here
-    print('Notification tapped: ${message.data}');
     final actionUrl = message.data['actionUrl'];
     if (actionUrl != null && actionUrl.isNotEmpty) {
       // TODO: Navigate to URL or specific screen
-      print('Opening URL: $actionUrl');
     }
   }
 
   static void _handleLocalNotificationTap(NotificationResponse response) {
     // Handle local notification tap
-    print('Local notification tapped: ${response.payload}');
     final actionUrl = response.payload;
     if (actionUrl != null && actionUrl.isNotEmpty) {
       // TODO: Navigate to URL or specific screen
-      print('Opening URL: $actionUrl');
     }
   }
 
@@ -227,5 +222,4 @@ class NotificationService {
 
 // Background message handler
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('Handling a background message: ${message.messageId}');
 }

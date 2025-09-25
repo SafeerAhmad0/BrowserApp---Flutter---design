@@ -49,11 +49,9 @@ class AdminCardService {
       }
 
       _isLoaded = true;
-      print('🟢 ADMIN CARDS: Loaded ${_adminCards.length} admin cards');
 
       return _adminCards;
     } catch (e) {
-      print('🔴 ADMIN CARDS ERROR: Failed to load admin cards: $e');
       _adminCards = [];
       _isLoaded = true;
       return [];

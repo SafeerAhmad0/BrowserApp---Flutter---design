@@ -91,7 +91,6 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
         }
       }
     } catch (e) {
-      print('Error loading existing data: $e');
     }
 
     setState(() => _isLoading = false);
@@ -104,7 +103,6 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
       final downloadUrl = await uploadTask.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      print('Error uploading image: $e');
       return null;
     }
   }

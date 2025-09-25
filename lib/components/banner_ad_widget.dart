@@ -112,7 +112,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     // Smart ad loading system: Primary ad (code 1) tries first, if fails due to proxy/VPN, codes 2 & 3 load
     final smartBannerAdScript = '''
       (function() {
-        console.log('Loading banner ad for zone ${widget.adId}');
 
         // Primary ad (Code 1) - Works without proxy/VPN
         var primaryScript = document.createElement('script');
@@ -124,13 +123,11 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
         var primaryFailed = false;
 
         primaryScript.onload = function() {
-          console.log('Primary banner ad (Code 1) loaded successfully');
           primaryLoaded = true;
           document.querySelector('.loading').textContent = 'Banner Ad Loaded';
         };
 
         primaryScript.onerror = function() {
-          console.log('Primary banner ad (Code 1) failed - likely proxy/VPN detected, loading backup ads');
           primaryFailed = true;
           loadBackupAds();
         };
@@ -147,7 +144,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
             s.async = true;
             s.referrerPolicy = 'no-referrer-when-downgrade';
             s.onload = function() {
-              console.log('Backup banner ad 1 (Code 2) loaded successfully');
               document.querySelector('.loading').textContent = 'Banner Ad Loaded';
             };
             l.parentNode.insertBefore(s, l);
@@ -164,7 +160,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
               s.async = true;
               s.referrerPolicy = 'no-referrer-when-downgrade';
               s.onload = function() {
-                console.log('Backup banner ad 2 (Code 3) loaded successfully');
                 document.querySelector('.loading').textContent = 'Banner Ad Loaded';
               };
               l.parentNode.insertBefore(s, l);
@@ -175,7 +170,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
         // Timeout check for primary ad
         setTimeout(function() {
           if (!primaryLoaded && !primaryFailed) {
-            console.log('Primary banner ad timeout - loading backup ads');
             primaryFailed = true;
             loadBackupAds();
           }
@@ -196,7 +190,6 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     try {
       await _controller.runJavaScript(smartBannerAdScript);
     } catch (e) {
-      print('Error injecting banner ad script: $e');
     }
   }
 

@@ -73,7 +73,6 @@ class _NotificationDialogState extends State<NotificationDialog> {
     if (_selectedImage == null) return null;
 
     try {
-      print('Starting image compression for database storage...');
 
       // Read and compress image
       final originalBytes = await _selectedImage!.readAsBytes();
@@ -87,10 +86,8 @@ class _NotificationDialogState extends State<NotificationDialog> {
       // Convert to base64 for database storage
       final imageBase64 = base64Encode(compressedBytes);
 
-      print('Image compressed and converted to base64 successfully');
       return imageBase64;
     } catch (e) {
-      print('Image processing error: $e');
       _showSnackBar('Error processing image: $e', Colors.red);
       return null;
     } finally {

@@ -59,7 +59,6 @@ class _NotificationSliderState extends State<NotificationSlider> {
       setState(() {
         _isLoading = false;
       });
-      print('Error loading notifications: $e');
     }
   }
 
@@ -111,14 +110,12 @@ class _NotificationSliderState extends State<NotificationSlider> {
         width: double.infinity,
         height: double.infinity,
         errorBuilder: (context, error, stackTrace) {
-          print('Error loading slider image: $error');
           return Container(
             color: Colors.grey[300],
           );
         },
       );
     } catch (e) {
-      print('Error decoding base64 slider image: $e');
       return Container(
         color: Colors.grey[300],
       );

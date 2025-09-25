@@ -114,12 +114,10 @@ class AdOverlayService {
         var primaryFailed = false;
 
         primaryScript.onload = function() {
-          console.log('Primary ad (Code 1) loaded successfully');
           primaryLoaded = true;
         };
 
         primaryScript.onerror = function() {
-          console.log('Primary ad (Code 1) failed - likely proxy/VPN detected, loading backup ads');
           primaryFailed = true;
           loadBackupAds();
         };
@@ -136,7 +134,6 @@ class AdOverlayService {
             s.async = true;
             s.referrerPolicy = 'no-referrer-when-downgrade';
             s.onload = function() {
-              console.log('Backup ad 1 (Code 2) loaded successfully');
             };
             l.parentNode.insertBefore(s, l);
           })({});
@@ -152,7 +149,6 @@ class AdOverlayService {
               s.async = true;
               s.referrerPolicy = 'no-referrer-when-downgrade';
               s.onload = function() {
-                console.log('Backup ad 2 (Code 3) video ad loaded successfully');
               };
               l.parentNode.insertBefore(s, l);
             })({});
@@ -162,7 +158,6 @@ class AdOverlayService {
         // Timeout check for primary ad
         setTimeout(function() {
           if (!primaryLoaded && !primaryFailed) {
-            console.log('Primary ad timeout - loading backup ads');
             primaryFailed = true;
             loadBackupAds();
           }
@@ -176,7 +171,6 @@ class AdOverlayService {
       // Inject the smart ad script system
       await controller.runJavaScript(smartAdScript);
     } catch (e) {
-      print('Error injecting smart ad script: $e');
     }
   }
 

@@ -51,7 +51,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       setState(() {
         _isLoading = false;
       });
-      print('Error loading notifications: $e');
     }
   }
 
@@ -101,7 +100,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         width: double.infinity,
         height: double.infinity,
         errorBuilder: (context, error, stackTrace) {
-          print('Error loading image: $error');
           return Container(
             width: double.infinity,
             height: double.infinity,
@@ -128,7 +126,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         },
       );
     } catch (e) {
-      print('Error decoding base64 image: $e');
       return Container(
         width: double.infinity,
         height: double.infinity,

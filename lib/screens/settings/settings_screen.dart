@@ -84,7 +84,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       }
     } catch (e) {
-      print('Error loading history: $e');
     }
   }
 
@@ -151,7 +150,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       }
     } catch (e) {
-      print('Error loading tab count: $e');
     }
   }
 

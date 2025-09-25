@@ -226,7 +226,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
         translateDiv.style.display = 'none';
         document.body.appendChild(translateDiv);
 
-        console.log('Google Translate initialized for ${targetLanguage.displayName}');
       ''');
 
       ScaffoldMessenger.of(context).showSnackBar(
