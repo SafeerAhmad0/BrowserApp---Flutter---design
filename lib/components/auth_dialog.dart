@@ -338,9 +338,92 @@ class _AuthDialogState extends State<AuthDialog> with TickerProviderStateMixin {
       if (!mounted) return;
       String message = e.toString().replaceAll('Exception: ', '');
       final lower = message.toLowerCase();
+
+      // Check if this is the PigeonUserDetails error or if user is actually logged in
+      final currentUser = AuthService().currentUser;
+
+      // If user is logged in despite the error, show success message
+      if (currentUser != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Login Successful!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        // Check if admin and show admin message
+        final isAdmin = AuthService().isAdmin();
+        if (isAdmin) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) {
+            await showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('ADMIN LOGIN'),
+                content: const Text('You are logged in as an admin.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          }
+        }
+
+        if (mounted) Navigator.pop(context);
+        return;
+      }
+
+      // Handle real authentication errors
       if (lower.contains('wrong password') || lower.contains('no user found') || lower.contains('invalid email')) {
         message = 'Wrong email or password.';
+      } else if (lower.contains('pigeonuserdetails') || lower.contains('list<object>') || lower.contains('type cast')) {
+        // Hide the PigeonUserDetails/TypeCast error and show success message
+        // Check if user is actually logged in after the error
+        await Future.delayed(const Duration(milliseconds: 100));
+        final userAfterError = AuthService().currentUser;
+
+        if (userAfterError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Login Successful!'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+
+          // Check if admin and show admin message
+          final isAdmin = AuthService().isAdmin();
+          if (isAdmin) {
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (mounted) {
+              await showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('ADMIN LOGIN'),
+                  content: const Text('You are logged in as an admin.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
+          if (mounted) Navigator.pop(context);
+          return;
+        }
+
+        // If no user after error, it's a real error - but hide the technical details
+        message = 'Login failed. Please try again.';
       }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
