@@ -6,7 +6,7 @@ import '../news/all_news_screen.dart';
 import '../news/news_detail_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../webview/web_view_screen.dart';
-import '../admin/admin_panel.dart';
+import '../admin/new_admin_panel.dart';
 import '../../components/auth_dialog.dart';
 import '../../services/auth_service.dart';
 import '../../services/language_service.dart';
@@ -24,6 +24,10 @@ import '../tabs/tab_manager_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../models/tab.dart';
 import '../../components/native_ad_widget.dart';
+import '../../components/banner_ad_widget.dart';
+import '../../components/admin_card_widget.dart';
+import '../../services/admin_card_service.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,17 +56,24 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentPage = 1;
   final GlobalKey<TopSearchBarState> _searchBarKey = GlobalKey<TopSearchBarState>();
   bool _isDesktopMode = false;
+  NewsLanguage _currentTranslationLanguage = NewsLanguage.english;
 
   @override
   void initState() {
     super.initState();
     _initializeLanguageService();
     _loadNews();
+    _loadAdminCards();
     _checkAdminStatus();
     _setupScrollListener();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showNotificationsSlideshow();
+
+    // Listen to auth state changes to update admin status
+    _authService.authStateChanges.listen((user) {
+      print('🔴 ADMIN DEBUG: Auth state changed - User: ${user?.email}');
+      _checkAdminStatus();
     });
+
+    // Removed automatic notifications slideshow popup
   }
 
   Future<void> _initializeLanguageService() async {
@@ -89,10 +100,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkAdminStatus() async {
     final user = _authService.currentUser;
+    final wasAdmin = _isAdmin;
+    final isAdminNow = _authService.isAdmin(user);
+
     setState(() {
-      _isAdmin = _authService.isAdmin(user);
+      _isAdmin = isAdminNow;
     });
-    print('Admin status checked: $_isAdmin, User: ${user?.email}');
+
+    print('🔴 ADMIN DEBUG: ========== ADMIN STATUS CHECK ==========');
+    print('🔴 ADMIN DEBUG: Was admin: $wasAdmin');
+    print('🔴 ADMIN DEBUG: Is admin now: $_isAdmin');
+    print('🔴 ADMIN DEBUG: Current user: ${user?.email}');
+    print('🔴 ADMIN DEBUG: Expected admin email: admin@app.com');
+    print('🔴 ADMIN DEBUG: Email matches: ${user?.email == "admin@app.com"}');
+    print('🔴 ADMIN DEBUG: AuthService.isAdmin result: $isAdminNow');
+    print('🔴 ADMIN DEBUG: ==========================================');
+  }
+
+  Future<void> _loadAdminCards() async {
+    try {
+      await AdminCardService.loadAdminCards();
+      print('🟢 ADMIN CARDS: Successfully loaded ${AdminCardService.adminCards.length} cards');
+    } catch (e) {
+      print('🔴 ADMIN CARDS ERROR: Failed to load admin cards: $e');
+    }
   }
 
   Future<void> _loadNews() async {
@@ -332,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AdminPanel(),
+                      builder: (context) => const NewAdminPanel(),
                     ),
                   );
                 },
@@ -803,7 +834,176 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _translatePage(NewsLanguage targetLanguage) async {
+    if (!_isOnHomePage && _currentController != null) {
+      // WebView translation
+      if (targetLanguage == NewsLanguage.english) {
+        // Remove translation
+        await _currentController!.runJavaScript('''
+          // Remove any existing Google Translate elements
+          var googleTranslateElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
+          googleTranslateElements.forEach(function(element) {
+            element.remove();
+          });
+
+          // Restore original content if cached
+          if (window.originalBodyHTML) {
+            document.body.innerHTML = window.originalBodyHTML;
+          }
+        ''');
+        setState(() => _currentTranslationLanguage = NewsLanguage.english);
+        return;
+      }
+
+      setState(() => _currentTranslationLanguage = targetLanguage);
+
+      try {
+        // Inject Google Translate for WebView
+        await _currentController!.runJavaScript('''
+          // Cache original content
+          if (!window.originalBodyHTML) {
+            window.originalBodyHTML = document.body.innerHTML;
+          }
+
+          // Remove existing Google Translate elements
+          var existingElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
+          existingElements.forEach(function(element) {
+            element.remove();
+          });
+
+          // Add Google Translate script
+          if (!document.querySelector('script[src*="translate.google.com"]')) {
+            var script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+            document.getElementsByTagName('head')[0].appendChild(script);
+          }
+
+          // Initialize Google Translate
+          window.googleTranslateElementInit = function() {
+            new google.translate.TranslateElement({
+              pageLanguage: 'en',
+              includedLanguages: '${targetLanguage.code}',
+              layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+              autoDisplay: false
+            }, 'google_translate_element');
+
+            // Auto-trigger translation
+            setTimeout(function() {
+              var selectElement = document.querySelector('.goog-te-combo');
+              if (selectElement) {
+                selectElement.value = '${targetLanguage.code}';
+                selectElement.dispatchEvent(new Event('change'));
+              }
+            }, 1000);
+          };
+
+          // Add translate element container
+          var translateDiv = document.createElement('div');
+          translateDiv.id = 'google_translate_element';
+          translateDiv.style.display = 'none';
+          document.body.appendChild(translateDiv);
+
+          console.log('Google Translate initialized for ${targetLanguage.displayName}');
+        ''');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🌍 Translating page to ${targetLanguage.displayName}...'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF2196F3),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('❌ Translation failed. Please try again.'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _currentTranslationLanguage = NewsLanguage.english);
+      }
+    } else {
+      // Home page - just change news language
+      setState(() => _currentTranslationLanguage = targetLanguage);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🌍 News language set to ${targetLanguage.displayName}'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF2196F3),
+        ),
+      );
+    }
+  }
+
+  void _showTranslateMenu() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.translate, color: Color(0xFF2196F3)),
+              const SizedBox(width: 8),
+              Text(_isOnHomePage ? 'News Language' : 'Translate Page'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_isOnHomePage
+                  ? 'Choose language for news content:'
+                  : 'Choose a language to translate this page:'),
+              const SizedBox(height: 16),
+              ...NewsLanguage.values.map((language) => Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: language == _currentTranslationLanguage
+                      ? const Color(0xFF2196F3).withOpacity(0.1)
+                      : null,
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    language == _currentTranslationLanguage
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: language == _currentTranslationLanguage
+                        ? const Color(0xFF2196F3)
+                        : Colors.grey,
+                  ),
+                  title: Text(
+                    language.displayName,
+                    style: TextStyle(
+                      fontWeight: language == _currentTranslationLanguage
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _translatePage(language);
+                  },
+                ),
+              )),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showSettingsMenu() {
+    // Refresh admin status before showing menu
+    _checkAdminStatus();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -828,14 +1028,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Translate option
             ListTile(
-              leading: const Icon(Icons.translate, color: Color(0xFF2196F3)),
-              title: const Text('Translate'),
+              leading: Icon(
+                Icons.translate,
+                color: _currentTranslationLanguage != NewsLanguage.english
+                  ? const Color(0xFF2196F3)
+                  : Colors.grey,
+              ),
+              title: Text(
+                _currentTranslationLanguage == NewsLanguage.english
+                    ? 'Translate Page'
+                    : 'Translate: ${_currentTranslationLanguage.displayName}',
+              ),
+              trailing: _currentTranslationLanguage != NewsLanguage.english
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2196F3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'ON',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Implement translate functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Translate feature coming soon!')),
-                );
+                _showTranslateMenu();
               },
             ),
 
@@ -938,9 +1161,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   context: context,
                   barrierDismissible: true,
                   builder: (context) => const AuthDialog(),
-                );
+                ).then((_) {
+                  // Refresh admin status after auth dialog closes
+                  _checkAdminStatus();
+                });
               },
             ),
+
+            // Admin panel option if admin (THREE-DOT MENU)
+            if (_isAdmin)
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings, color: Colors.orange),
+                title: const Text('Admin Panel'),
+                subtitle: const Text('Manage app content & notifications'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NewAdminPanel(),
+                    ),
+                  );
+                },
+              ),
 
             const SizedBox(height: 20),
           ],
@@ -1107,9 +1350,9 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // BlueX Header with new styling - Blue bold & small, X thin & big
+            // BlueX Header - Blue bold & small, X thin & big
             Container(
-              margin: const EdgeInsets.symmetric(vertical: 20),
+              margin: const EdgeInsets.symmetric(vertical: 10),
               child: RichText(
                 text: const TextSpan(
                   style: TextStyle(
@@ -1126,17 +1369,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     TextSpan(
                       text: 'Blue',
                       style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -1,
+                        fontSize: 42,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     TextSpan(
                       text: 'X',
                       style: TextStyle(
-                        fontSize: 72,
-                        fontWeight: FontWeight.w300,
-                        letterSpacing: -2,
+                        fontSize: 68,
+                        fontWeight: FontWeight.w200,
+                        letterSpacing: -1,
                       ),
                     ),
                   ],
@@ -1146,7 +1389,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Search Bar right after BlueX logo
             Container(
-              margin: const EdgeInsets.all(20.0),
+              margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(30),
@@ -1176,7 +1419,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Scrollable Quick Access Icons Row with White Background
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -1194,37 +1437,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
-                    _buildQuickAccessIcon(
+                    _buildQuickAccessIconWithAsset(
                       'ChatGPT',
-                      Icons.chat,
-                      Colors.green,
+                      'assets/svgs/ChatGPT_logo.svg.png',
                       'https://chat.openai.com',
                     ),
                     const SizedBox(width: 16),
-                    _buildQuickAccessIcon(
-                      'Grokai',
-                      Icons.psychology,
-                      Colors.purple,
+                    _buildQuickAccessIconWithAsset(
+                      'GrokAI',
+                      'assets/svgs/GrokAI.png',
                       'https://groq.com',
                     ),
                     const SizedBox(width: 16),
-                    _buildQuickAccessIcon(
+                    _buildQuickAccessIconWithAsset(
                       'Amazon',
-                      Icons.shopping_bag,
-                      Colors.orange,
+                      'assets/svgs/amazon-logo.png',
                       'https://www.amazon.com',
                     ),
                     const SizedBox(width: 16),
                     _buildQuickAccessIcon(
                       'Daraz',
-                      Icons.local_mall,
+                      Icons.shopping_cart,
                       Colors.deepOrange,
                       'https://www.daraz.pk',
                     ),
                     const SizedBox(width: 16),
                     _buildQuickAccessIcon(
                       'YouTube',
-                      Icons.video_library,
+                      Icons.play_circle,
                       Colors.red,
                       'https://www.youtube.com',
                     ),
@@ -1236,17 +1476,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       'https://www.facebook.com',
                     ),
                     const SizedBox(width: 16),
-                    _buildQuickAccessIcon(
+                    _buildQuickAccessIconWithAsset(
                       'Google',
-                      Icons.search,
-                      Colors.blue,
+                      'assets/svgs/google.png',
                       'https://www.google.com',
                     ),
                     const SizedBox(width: 16),
-                    _buildQuickAccessIcon(
+                    _buildQuickAccessIconWithAsset(
                       'Twitter',
-                      Icons.alternate_email,
-                      Colors.lightBlue,
+                      'assets/svgs/twitter.svg',
                       'https://www.twitter.com',
                     ),
                     const SizedBox(width: 16),
@@ -1560,48 +1798,133 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     return InkWell(
       onTap: () => _addNewTab(url),
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        children: [
-          // Chrome-style circular icon container
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: color.withOpacity(0.3),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.2),
-                  offset: const Offset(0, 2),
-                  blurRadius: 8,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 74,
+        child: Column(
+          children: [
+            // Chrome-style circular icon container with more realistic design
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.grey.shade200,
+                  width: 1,
                 ),
-              ],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    offset: const Offset(0, 1),
+                    blurRadius: 3,
+                  ),
+                ],
+              ),
+              child: Icon(
+                icon,
+                size: 24,
+                color: color,
+              ),
             ),
-            child: Icon(
-              icon,
-              size: 28,
-              color: color,
+            const SizedBox(height: 8),
+            // Title below icon - Chrome style
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: Colors.grey[700],
+                height: 1.2,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          const SizedBox(height: 6),
-          // Title below icon
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[800],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessIconWithAsset(
+    String title,
+    String assetPath,
+    String url,
+  ) {
+    return InkWell(
+      onTap: () => _addNewTab(url),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 74,
+        child: Column(
+          children: [
+            // Chrome-style circular icon container with custom asset
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.grey.shade200,
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    offset: const Offset(0, 1),
+                    blurRadius: 3,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: assetPath.endsWith('.svg')
+                  ? SvgPicture.asset(
+                      assetPath,
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.contain,
+                      placeholderBuilder: (BuildContext context) => Icon(
+                        Icons.image,
+                        size: 24,
+                        color: Colors.grey[400],
+                      ),
+                    )
+                  : Image.asset(
+                      assetPath,
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Error loading image $assetPath: $error');
+                        return Icon(
+                          Icons.image,
+                          size: 24,
+                          color: Colors.grey[400],
+                        );
+                      },
+                    ),
+              ),
             ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const SizedBox(height: 8),
+            // Title below icon - Chrome style
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: Colors.grey[700],
+                height: 1.2,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1610,22 +1933,36 @@ class _HomeScreenState extends State<HomeScreen> {
     List<Widget> items = [];
     int newsIndex = 0;
     int adCounter = 0;
+    int adminCardCounter = 0;
 
-    // Pattern: 2 news → ad → 3 news → ad → 3 news → ad → repeat
     while (newsIndex < _newsArticles.length) {
-      // Add 2 news articles first
-      int articlesToAdd = (adCounter == 0) ? 2 : 3;
+      // Add 2-3 news articles
+      int articlesToAdd = (items.isEmpty) ? 2 : 3;
 
       for (int i = 0; i < articlesToAdd && newsIndex < _newsArticles.length; i++) {
         items.add(_buildNewsCard(_newsArticles[newsIndex]));
         newsIndex++;
       }
 
-      // Add real ad after every group
-      if (newsIndex < _newsArticles.length) {
-        items.add(NativeAdWidget(
+      // Add admin card if available (cycling pattern: 1,2,3,1,2,3...)
+      if (AdminCardService.adminCards.isNotEmpty && newsIndex < _newsArticles.length) {
+        final adminCard = AdminCardService.getCardByIndex(adminCardCounter);
+        final displayNumber = AdminCardService.getCardDisplayNumber(adminCardCounter);
+
+        if (adminCard != null) {
+          items.add(AdminCardWidget(
+            adminCard: adminCard,
+            cardNumber: displayNumber,
+          ));
+          adminCardCounter++;
+        }
+      }
+
+      // Add banner ad occasionally (less frequent than admin cards)
+      if (newsIndex < _newsArticles.length && adCounter < 1 && items.length > 15) {
+        items.add(BannerAdWidget(
           adId: adCounter,
-          height: 180,
+          height: 120,
         ));
         adCounter++;
       }

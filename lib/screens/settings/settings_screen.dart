@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../notifications/notifications_screen.dart';
-import '../admin/admin_panel.dart';
+import '../admin/new_admin_panel.dart';
 import '../../services/auth_service.dart';
 import '../../services/language_service.dart';
 import '../../components/auth_dialog.dart';
@@ -318,7 +318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AdminPanel(),
+                      builder: (context) => const NewAdminPanel(),
                     ),
                   );
                 },

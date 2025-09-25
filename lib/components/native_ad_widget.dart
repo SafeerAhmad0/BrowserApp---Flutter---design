@@ -37,9 +37,8 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          // Randomly show "ads" or "no ads" for demonstration
-          // In reality, you'd check if ad actually loaded
-          _adLoaded = (widget.adId % 3 == 0); // Show ads for some zones, not others
+          // Show ads for most zones to ensure visibility
+          _adLoaded = (widget.adId % 4 != 3); // Show ads for 3 out of 4 zones
         });
       }
     });

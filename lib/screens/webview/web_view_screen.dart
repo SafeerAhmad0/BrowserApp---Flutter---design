@@ -4,6 +4,7 @@ import '../../services/ad_block_service.dart';
 import '../../services/ad_overlay_service.dart';
 import '../../services/history_service.dart';
 import '../../services/tab_service.dart';
+import '../../services/language_preference_service.dart';
 import '../tabs/tab_manager_screen.dart';
 import '../../models/tab.dart';
 
@@ -29,6 +30,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _isDesktopMode = false;
   bool _isAdBlockEnabled = true;
   String? _currentTabId;
+  NewsLanguage _currentTranslationLanguage = NewsLanguage.english;
 
   @override
   void initState() {
@@ -270,6 +272,153 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
   }
 
+  void _translatePage(NewsLanguage targetLanguage) async {
+    if (targetLanguage == NewsLanguage.english) {
+      // Remove translation
+      await _controller.runJavaScript('''
+        // Remove any existing Google Translate elements
+        var googleTranslateElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
+        googleTranslateElements.forEach(function(element) {
+          element.remove();
+        });
+
+        // Restore original content if cached
+        if (window.originalBodyHTML) {
+          document.body.innerHTML = window.originalBodyHTML;
+        }
+      ''');
+      setState(() => _currentTranslationLanguage = NewsLanguage.english);
+      return;
+    }
+
+    setState(() => _currentTranslationLanguage = targetLanguage);
+
+    try {
+      // Inject Google Translate
+      await _controller.runJavaScript('''
+        // Cache original content
+        if (!window.originalBodyHTML) {
+          window.originalBodyHTML = document.body.innerHTML;
+        }
+
+        // Remove existing Google Translate elements
+        var existingElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
+        existingElements.forEach(function(element) {
+          element.remove();
+        });
+
+        // Add Google Translate script
+        if (!document.querySelector('script[src*="translate.google.com"]')) {
+          var script = document.createElement('script');
+          script.type = 'text/javascript';
+          script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+          document.getElementsByTagName('head')[0].appendChild(script);
+        }
+
+        // Initialize Google Translate
+        window.googleTranslateElementInit = function() {
+          new google.translate.TranslateElement({
+            pageLanguage: 'en',
+            includedLanguages: '${targetLanguage.code}',
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+            autoDisplay: false
+          }, 'google_translate_element');
+
+          // Auto-trigger translation
+          setTimeout(function() {
+            var selectElement = document.querySelector('.goog-te-combo');
+            if (selectElement) {
+              selectElement.value = '${targetLanguage.code}';
+              selectElement.dispatchEvent(new Event('change'));
+            }
+          }, 1000);
+        };
+
+        // Add translate element container
+        var translateDiv = document.createElement('div');
+        translateDiv.id = 'google_translate_element';
+        translateDiv.style.display = 'none';
+        document.body.appendChild(translateDiv);
+
+        console.log('Google Translate initialized for ${targetLanguage.displayName}');
+      ''');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🌍 Translating page to ${targetLanguage.displayName}...'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF2196F3),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('❌ Translation failed. Please try again.'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _currentTranslationLanguage = NewsLanguage.english);
+    }
+  }
+
+  void _showTranslateMenu() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.translate, color: Color(0xFF2196F3)),
+              const SizedBox(width: 8),
+              const Text('Translate Page'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Choose a language to translate this page:'),
+              const SizedBox(height: 16),
+              ...NewsLanguage.values.map((language) => Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: language == _currentTranslationLanguage
+                      ? const Color(0xFF2196F3).withOpacity(0.1)
+                      : null,
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    language == _currentTranslationLanguage
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: language == _currentTranslationLanguage ? const Color(0xFF2196F3) : Colors.grey,
+                  ),
+                  title: Text(
+                    language.displayName,
+                    style: TextStyle(
+                      fontWeight: language == _currentTranslationLanguage ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _translatePage(language);
+                  },
+                ),
+              )),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
 
 
@@ -297,6 +446,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
+            // Add smooth animation and styling
+            splashRadius: 20,
+            offset: const Offset(0, 50),
+            elevation: 8,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             onSelected: (value) {
               switch (value) {
                 case 'refresh':
@@ -307,6 +463,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   break;
                 case 'adblock':
                   _toggleAdBlock();
+                  break;
+                case 'translate':
+                  _showTranslateMenu();
                   break;
                 case 'tabs':
                   Navigator.push(
@@ -333,36 +492,80 @@ class _WebViewScreenState extends State<WebViewScreen> {
               }
             },
             itemBuilder: (BuildContext context) => [
-              const PopupMenuItem<String>(
+              PopupMenuItem<String>(
                 value: 'new_tab',
                 child: Row(
-                  children: [
+                  children: const [
                     Icon(Icons.add_box, color: Color(0xFF2196F3)),
-                    SizedBox(width: 8),
-                    Text('New Tab'),
+                    SizedBox(width: 12),
+                    Text('New Tab', style: TextStyle(fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
-              const PopupMenuItem<String>(
+              PopupMenuItem<String>(
                 value: 'tabs',
                 child: Row(
-                  children: [
+                  children: const [
                     Icon(Icons.tab, color: Color(0xFF2196F3)),
-                    SizedBox(width: 8),
-                    Text('Tab Manager'),
+                    SizedBox(width: 12),
+                    Text('Tab Manager', style: TextStyle(fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
-              const PopupMenuItem<String>(
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
                 value: 'refresh',
                 child: Row(
-                  children: [
+                  children: const [
                     Icon(Icons.refresh, color: Color(0xFF2196F3)),
-                    SizedBox(width: 8),
-                    Text('Refresh'),
+                    SizedBox(width: 12),
+                    Text('Refresh', style: TextStyle(fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
+              PopupMenuItem<String>(
+                value: 'translate',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.translate,
+                      color: _currentTranslationLanguage != NewsLanguage.english
+                        ? const Color(0xFF2196F3)
+                        : Colors.grey,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _currentTranslationLanguage == NewsLanguage.english
+                            ? 'Translate Page'
+                            : 'Translate: ${_currentTranslationLanguage.displayName}',
+                        style: TextStyle(
+                          fontWeight: _currentTranslationLanguage != NewsLanguage.english
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (_currentTranslationLanguage != NewsLanguage.english)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2196F3),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'ON',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
               PopupMenuItem<String>(
                 value: 'desktop',
                 child: Row(
@@ -371,8 +574,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       _isDesktopMode ? Icons.phone_android : Icons.desktop_windows,
                       color: const Color(0xFF2196F3),
                     ),
-                    const SizedBox(width: 8),
-                    Text(_isDesktopMode ? 'Mobile Mode' : 'Desktop Mode'),
+                    const SizedBox(width: 12),
+                    Text(
+                      _isDesktopMode ? 'Mobile Mode' : 'Desktop Mode',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
                   ],
                 ),
               ),
@@ -384,8 +590,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       _isAdBlockEnabled ? Icons.block : Icons.ads_click,
                       color: _isAdBlockEnabled ? Colors.green : Colors.red,
                     ),
-                    const SizedBox(width: 8),
-                    Text(_isAdBlockEnabled ? 'Ad Block: ON' : 'Ad Block: OFF'),
+                    const SizedBox(width: 12),
+                    Text(
+                      _isAdBlockEnabled ? 'Ad Block: ON' : 'Ad Block: OFF',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
                   ],
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../services/ad_block_service.dart';
+import '../../services/language_preference_service.dart';
 import '../../components/search_bar.dart' as custom;
 
 class BrowserScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   String _currentTitle = '';
   final List<Tab> _tabs = [];
   int _activeTabIndex = 0;
+  NewsLanguage _currentTranslationLanguage = NewsLanguage.english;
   
   @override
   void initState() {
@@ -147,15 +149,140 @@ class _BrowserScreenState extends State<BrowserScreen> {
   
   void _toggleDesktopMode() {
     setState(() => _isDesktopMode = !_isDesktopMode);
-    
-    String userAgent = _isDesktopMode 
+
+    String userAgent = _isDesktopMode
       ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       : 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Mobile Safari/537.36';
-    
+
     _controller.setUserAgent(userAgent);
     _controller.reload();
   }
-  
+
+  void _translatePage(NewsLanguage targetLanguage) async {
+    if (targetLanguage == NewsLanguage.english) {
+      // Remove translation
+      await _controller.runJavaScript('''
+        // Remove any existing Google Translate elements
+        var googleTranslateElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
+        googleTranslateElements.forEach(function(element) {
+          element.remove();
+        });
+
+        // Restore original content if cached
+        if (window.originalBodyHTML) {
+          document.body.innerHTML = window.originalBodyHTML;
+        }
+      ''');
+      setState(() => _currentTranslationLanguage = NewsLanguage.english);
+      return;
+    }
+
+    setState(() => _currentTranslationLanguage = targetLanguage);
+
+    try {
+      // Inject Google Translate
+      await _controller.runJavaScript('''
+        // Cache original content
+        if (!window.originalBodyHTML) {
+          window.originalBodyHTML = document.body.innerHTML;
+        }
+
+        // Remove existing Google Translate elements
+        var existingElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
+        existingElements.forEach(function(element) {
+          element.remove();
+        });
+
+        // Add Google Translate script
+        if (!document.querySelector('script[src*="translate.google.com"]')) {
+          var script = document.createElement('script');
+          script.type = 'text/javascript';
+          script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+          document.getElementsByTagName('head')[0].appendChild(script);
+        }
+
+        // Initialize Google Translate
+        window.googleTranslateElementInit = function() {
+          new google.translate.TranslateElement({
+            pageLanguage: 'en',
+            includedLanguages: '${targetLanguage.code}',
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+            autoDisplay: false
+          }, 'google_translate_element');
+
+          // Auto-trigger translation
+          setTimeout(function() {
+            var selectElement = document.querySelector('.goog-te-combo');
+            if (selectElement) {
+              selectElement.value = '${targetLanguage.code}';
+              selectElement.dispatchEvent(new Event('change'));
+            }
+          }, 1000);
+        };
+
+        // Add translate element container
+        var translateDiv = document.createElement('div');
+        translateDiv.id = 'google_translate_element';
+        translateDiv.style.display = 'none';
+        document.body.appendChild(translateDiv);
+
+        console.log('Google Translate initialized for ${targetLanguage.displayName}');
+      ''');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Translating page to ${targetLanguage.displayName}...'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Translation failed. Please try again.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      setState(() => _currentTranslationLanguage = NewsLanguage.english);
+    }
+  }
+
+  void _showTranslateMenu() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Translate Page'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Choose a language to translate this page:'),
+              const SizedBox(height: 16),
+              ...NewsLanguage.values.map((language) => ListTile(
+                leading: Icon(
+                  language == _currentTranslationLanguage
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: language == _currentTranslationLanguage ? Colors.blue : null,
+                ),
+                title: Text(language.displayName),
+                onTap: () {
+                  Navigator.pop(context);
+                  _translatePage(language);
+                },
+              )),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   bool _shouldHideSearchBar() {
     if (_currentUrl.isEmpty) return false;
     
@@ -210,10 +337,30 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   ],
                 ),
               ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'translate_submenu',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.translate,
+                      color: _currentTranslationLanguage != NewsLanguage.english ? Colors.blue : Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(_currentTranslationLanguage == NewsLanguage.english
+                        ? 'Translate Page'
+                        : 'Translate: ${_currentTranslationLanguage.displayName}'),
+                    const Spacer(),
+                    const Icon(Icons.arrow_forward_ios, size: 16),
+                  ],
+                ),
+              ),
             ],
             onSelected: (value) {
               if (value == 'adblock') {
                 _toggleAdBlock();
+              } else if (value == 'translate_submenu') {
+                _showTranslateMenu();
               }
             },
           ),

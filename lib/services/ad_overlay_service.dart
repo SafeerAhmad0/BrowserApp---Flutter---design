@@ -45,7 +45,7 @@ class AdOverlayService {
     }
 
     // Show ad after page is loaded (initial ad) - faster loading
-    Future.delayed(const Duration(milliseconds: 500), () {
+    Future.delayed(const Duration(milliseconds: 200), () {
       if (!_isAdBlockEnabled && !_isAdCurrentlyShowing) {
         _showOverlayAd(context, controller);
       }
@@ -81,9 +81,22 @@ class AdOverlayService {
       return;
     }
 
-    // Inject ad block flag as false
+    // Inject ad block flag as false and suppress verification dialogs
     await controller.runJavaScript('''
       window.__BLUEX_ADBLOCK_ENABLED = false;
+
+      // Suppress common verification popups
+      window.alert = function() { return true; };
+      window.confirm = function() { return true; };
+
+      // Override common verification methods
+      if (window.addEventListener) {
+        window.addEventListener('beforeunload', function(e) {
+          // Suppress verification popups on page unload
+          e.preventDefault();
+          return undefined;
+        });
+      }
     ''');
 
     // Smart ad loading system: Primary ad (code 1) tries first, if fails due to proxy/VPN, codes 2 & 3 load

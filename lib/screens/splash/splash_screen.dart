@@ -119,7 +119,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                       const SizedBox(height: 30),
 
-                      // App Name with Rich Text for styling
+                      // App Name with Rich Text for styling - Blue thick but small, X thin but big
                       RichText(
                         textAlign: TextAlign.center,
                         text: const TextSpan(
@@ -137,15 +137,15 @@ class _SplashScreenState extends State<SplashScreen>
                             TextSpan(
                               text: 'Blue',
                               style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                             TextSpan(
                               text: 'X',
                               style: TextStyle(
-                                fontSize: 42,
-                                fontWeight: FontWeight.w300,
+                                fontSize: 40,
+                                fontWeight: FontWeight.w200,
                               ),
                             ),
                           ],

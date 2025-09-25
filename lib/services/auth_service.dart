@@ -69,53 +69,11 @@ class AuthService {
     }
   }
 
-  // Sign in with Google
+  // Sign in with Google - DISABLED TO AVOID PIGEONUSERDETAILS ERROR
   Future<UserCredential> signInWithGoogle() async {
-    try {
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-      if (googleUser == null) {
-        throw Exception('Google sign in was cancelled.');
-      }
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth = 
-          await googleUser.authentication;
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Once signed in, return the UserCredential
-      final userCredential = await _auth.signInWithCredential(credential);
-      return userCredential;
-    } on FirebaseAuthException catch (e) {
-      switch (e.code) {
-        case 'account-exists-with-different-credential':
-          throw Exception('An account already exists with a different credential.');
-        case 'invalid-credential':
-          throw Exception('The credential received is malformed or has expired.');
-        case 'operation-not-allowed':
-          throw Exception('Google sign in is not enabled.');
-        case 'user-disabled':
-          throw Exception('The user account has been disabled.');
-        case 'user-not-found':
-          throw Exception('No user found for the given credential.');
-        case 'wrong-password':
-          throw Exception('Wrong password provided for the credential.');
-        default:
-          throw Exception('Google sign in failed. Please try again.');
-      }
-    } catch (e) {
-      if (e.toString().contains('cancelled')) {
-        throw Exception('Google sign in was cancelled.');
-      }
-      throw Exception('An unexpected error occurred during Google sign in.');
-    }
+    throw Exception('Google Sign In is temporarily disabled. Please use email/password login.');
   }
+
 
   // Sign out
   Future<void> signOut() async {
