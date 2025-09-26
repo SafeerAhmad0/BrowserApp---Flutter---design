@@ -954,7 +954,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? const Color(0xFF2196F3)
                         : Colors.grey,
                   ),
-                  title: Text(
+                  title: Text(  
                     language.displayName,
                     style: TextStyle(
                       fontWeight: language == _currentTranslationLanguage
