@@ -88,11 +88,6 @@ class ConsolidatedAdService {
   static Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     _isEnabled = prefs.getBool('consolidated_ads_enabled') ?? true;
-
-    print('🎯 CONSOLIDATED AD SERVICE INITIALIZED');
-    print('   Ads Enabled: $_isEnabled');
-    print('   Search Triggers: ${_searchTriggerSites.length} sites');
-    print('   Visit Triggers: ${_visitTriggerSites.length} sites');
   }
 
   static Future<void> setEnabled(bool enabled) async {
@@ -113,7 +108,6 @@ class ConsolidatedAdService {
   // Main ad injection method - handles all rules and triggers
   static Future<void> processPageLoad(WebViewController controller, String url) async {
     if (!_isEnabled) {
-      print('🚫 Ads disabled - skipping injection');
       return;
     }
 
@@ -121,7 +115,6 @@ class ConsolidatedAdService {
     if (uri == null) return;
 
     final domain = uri.host.toLowerCase();
-    print('🔍 Processing page: $domain');
 
     // Check for search trigger
     if (_shouldTriggerOnSearch(domain)) {
@@ -148,11 +141,9 @@ class ConsolidatedAdService {
   static Future<void> _handleSearchTrigger(WebViewController controller, String domain) async {
     final key = 'search_$domain';
     if (_triggeredOnSearch.contains(key)) {
-      print('⏭️ Search trigger already fired for $domain');
       return;
     }
 
-    print('🔍 SEARCH TRIGGER: Injecting ads on $domain');
     await _injectAllAdScripts(controller);
     _triggeredOnSearch.add(key);
 
@@ -165,11 +156,9 @@ class ConsolidatedAdService {
   static Future<void> _handleVisitTrigger(WebViewController controller, String domain) async {
     final key = 'visit_$domain';
     if (_triggeredOnVisit.contains(key)) {
-      print('⏭️ Visit trigger already fired for $domain');
       return;
     }
 
-    print('🌐 VISIT TRIGGER: Injecting ads on $domain');
     await _injectAllAdScripts(controller);
     _triggeredOnVisit.add(key);
 
@@ -192,7 +181,6 @@ class ConsolidatedAdService {
   static Future<void> _handleTimerTrigger(WebViewController controller) async {
     if (_isAdCurrentlyShowing) return;
 
-    print('⏰ TIMER TRIGGER: 2-minute interval ad injection');
     _isAdCurrentlyShowing = true;
 
     await _injectAllAdScripts(controller);
@@ -208,8 +196,6 @@ class ConsolidatedAdService {
     if (!_isEnabled) return;
 
     try {
-      print('💉 Injecting consolidated ad scripts...');
-
       // Combined injection script that loads all three ad scripts with error handling
       final consolidatedAdScript = '''
         (function() {
@@ -297,21 +283,18 @@ class ConsolidatedAdService {
       ''';
 
       await controller.runJavaScript(consolidatedAdScript);
-      print('✅ Ad scripts injected successfully');
 
     } catch (e) {
-      print('❌ Failed to inject ad scripts: $e');
+      // Silent error handling
     }
   }
 
   // Manual ad injection (for testing or immediate injection)
   static Future<void> injectAdsManually(WebViewController controller) async {
     if (!_isEnabled) {
-      print('🚫 Manual ad injection blocked - ads are disabled');
       return;
     }
 
-    print('🔧 MANUAL TRIGGER: Injecting ads on demand');
     await _injectAllAdScripts(controller);
   }
 
@@ -334,6 +317,5 @@ class ConsolidatedAdService {
     _triggeredOnSearch.clear();
     _triggeredOnVisit.clear();
     _isAdCurrentlyShowing = false;
-    print('🧹 Consolidated Ad Service disposed');
   }
 }

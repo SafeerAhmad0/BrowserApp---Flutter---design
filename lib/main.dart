@@ -20,13 +20,8 @@ Future<void> main() async {
   await NotificationService.requestPermission();
   await LanguageService.initialize();
   await VoiceSearchService.initialize();
-  print('🔄 STARTING PROXY SERVICE INITIALIZATION...');
   await ProxyService().initialize(); // ALWAYS INITIALIZE PROXY ON APP START
-  print('✅ PROXY SERVICE INITIALIZATION COMPLETE');
-
-  print('🎯 STARTING CONSOLIDATED AD SERVICE INITIALIZATION...');
   await ConsolidatedAdService.initialize(); // INITIALIZE CONSOLIDATED AD SERVICE
-  print('✅ CONSOLIDATED AD SERVICE INITIALIZATION COMPLETE');
   runApp(const MyApp());
 }
 

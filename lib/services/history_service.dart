@@ -69,7 +69,7 @@ class HistoryService {
       final jsonList = historyItems.map((item) => item.toJson()).toList();
       await prefs.setString(_historyKey, json.encode(jsonList));
     } catch (e) {
-      print('Error saving to history: $e');
+      // Silent error handling
     }
   }
 
@@ -85,7 +85,6 @@ class HistoryService {
           .map((json) => HistoryItem.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('Error loading history: $e');
       return [];
     }
   }
@@ -111,7 +110,7 @@ class HistoryService {
       final jsonList = historyItems.map((item) => item.toJson()).toList();
       await prefs.setString(_historyKey, json.encode(jsonList));
     } catch (e) {
-      print('Error removing from history: $e');
+      // Silent error handling
     }
   }
 
@@ -120,7 +119,7 @@ class HistoryService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_historyKey);
     } catch (e) {
-      print('Error clearing history: $e');
+      // Silent error handling
     }
   }
 

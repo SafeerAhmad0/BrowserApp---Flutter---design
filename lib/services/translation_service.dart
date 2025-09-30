@@ -24,7 +24,6 @@ class TranslationService {
     if (_memoryCache.containsKey(cacheKey)) {
       final cached = _memoryCache[cacheKey]!;
       if (_isCacheValid(cached['timestamp'])) {
-        print('📝 Translation cache HIT (memory): ${text.substring(0, 50)}...');
         return cached['translation'];
       } else {
         _memoryCache.remove(cacheKey);
@@ -39,13 +38,10 @@ class TranslationService {
         'translation': cachedTranslation,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
-      print('📝 Translation cache HIT (disk): ${text.substring(0, 50)}...');
       return cachedTranslation;
     }
 
     try {
-      print('🌐 Translating: ${text.substring(0, 50)}... -> ${targetLanguage.displayName}');
-
       // Perform translation
       final translation = await _translator.translate(
         text,
@@ -54,7 +50,6 @@ class TranslationService {
       );
 
       final translatedText = translation.text;
-      print('✅ Translation success: ${translatedText.substring(0, 50)}...');
 
       // Cache the translation
       await _cacheTranslation(text, targetLanguage, translatedText);
@@ -68,7 +63,6 @@ class TranslationService {
       return translatedText;
 
     } catch (e) {
-      print('❌ Translation failed: $e');
 
       // Return original text with language indicator on failure
       switch (targetLanguage) {
@@ -128,9 +122,7 @@ class TranslationService {
       'Save',
     ];
 
-    print('🔄 Preloading common translations for ${targetLanguage.displayName}...');
     await translateBatch(commonTexts, targetLanguage);
-    print('✅ Common translations preloaded');
   }
 
   /// Generates a unique cache key for translation
@@ -162,7 +154,7 @@ class TranslationService {
         }
       }
     } catch (e) {
-      print('Error reading translation cache: $e');
+      // Silent error handling
     }
     return null;
   }
@@ -185,7 +177,7 @@ class TranslationService {
 
       await prefs.setString(cacheKey, json.encode(cacheData));
     } catch (e) {
-      print('Error caching translation: $e');
+      // Silent error handling
     }
   }
 
@@ -195,8 +187,6 @@ class TranslationService {
       final keys = prefs.getKeys().where((key) => key.startsWith(_cacheKeyPrefix)).toList();
 
       if (keys.length > _maxCacheSize) {
-        print('🧹 Cleaning translation cache (${keys.length} entries)...');
-
         // Sort by timestamp and remove oldest entries
         final List<Map<String, dynamic>> cacheEntries = [];
 
@@ -224,11 +214,9 @@ class TranslationService {
         for (int i = 0; i < entriesToRemove; i++) {
           await prefs.remove(cacheEntries[i]['key']);
         }
-
-        print('✅ Removed $entriesToRemove old cache entries');
       }
     } catch (e) {
-      print('Error cleaning translation cache: $e');
+      // Silent error handling
     }
   }
 
@@ -243,9 +231,8 @@ class TranslationService {
       }
 
       _memoryCache.clear();
-      print('🗑️ All translation cache cleared (${keys.length} entries)');
     } catch (e) {
-      print('Error clearing translation cache: $e');
+      // Silent error handling
     }
   }
 

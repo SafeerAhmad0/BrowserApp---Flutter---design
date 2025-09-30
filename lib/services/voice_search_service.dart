@@ -13,19 +13,15 @@ class VoiceSearchService {
     try {
       _isInitialized = await _speech.initialize(
         onError: (error) {
-          print('Speech recognition error: $error');
           _isListening = false;
         },
         onStatus: (status) {
-          print('Speech recognition status: $status');
           _isListening = status == 'listening';
         },
       );
-      
-      print('VoiceSearchService initialized: $_isInitialized');
+
       return _isInitialized;
     } catch (e) {
-      print('Error initializing speech recognition: $e');
       _isInitialized = false;
       return false;
     }
@@ -36,7 +32,6 @@ class VoiceSearchService {
       final status = await Permission.microphone.request();
       return status == PermissionStatus.granted;
     } catch (e) {
-      print('Error requesting microphone permission: $e');
       return false;
     }
   }
@@ -66,7 +61,6 @@ class VoiceSearchService {
       await _speech.listen(
         onResult: (result) {
           _lastWords = result.recognizedWords;
-          print('Speech result: $_lastWords');
         },
         listenFor: const Duration(seconds: 10),
         pauseFor: const Duration(seconds: 3),
@@ -84,7 +78,6 @@ class VoiceSearchService {
 
       return _lastWords.isNotEmpty ? _lastWords : null;
     } catch (e) {
-      print('Error during speech recognition: $e');
       _isListening = false;
       throw Exception('Speech recognition failed: $e');
     }

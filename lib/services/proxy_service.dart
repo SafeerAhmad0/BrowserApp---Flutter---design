@@ -89,12 +89,6 @@ class ProxyService {
     if (!prefs.containsKey(_proxyEnabledKey)) {
       await setProxyEnabled(true);
     }
-
-    // DEBUG: Print initialization status
-    print('🔧 PROXY SERVICE INITIALIZED:');
-    print('   Proxy Enabled: $_isProxyEnabled');
-    print('   Selected Server: ${_selectedServer?.name} (${_selectedServer?.host}:${_selectedServer?.port})');
-    print('   Available Servers: ${_servers.length}');
   }
 
   Future<void> setProxyEnabled(bool enabled) async {
@@ -141,11 +135,6 @@ class ProxyService {
     final isBlocked = blockedDomains.any((blocked) =>
       domain.contains(blocked) || domain.endsWith('.$blocked'));
 
-    // DEBUG: Print to console for testing
-    print('🔍 PROXY CHECK: $url');
-    print('   Domain: $domain');
-    print('   Blocked: $isBlocked');
-    print('   Proxy Enabled: $_isProxyEnabled');
 
     return isBlocked;
   }
@@ -164,12 +153,10 @@ class ProxyService {
         final response = await http.get(Uri.parse(url));
         return response.body;
       } catch (e) {
-        print('❌ DIRECT REQUEST FAILED: $e');
         return null;
       }
     }
 
-    print('🔥 FETCHING WITH PROXY: $url via ${_selectedServer!.host}:${_selectedServer!.port}');
 
     try {
       // Use HttpClient with HTTP proxy (this is the correct method for Squid proxy)
@@ -200,29 +187,22 @@ class ProxyService {
 
       final response = await request.close();
 
-      print('🌐 PROXY RESPONSE STATUS: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final body = await response.transform(utf8.decoder).join();
         client.close();
-        print('✅ PROXY FETCH SUCCESS: ${body.length} characters');
         return body;
       } else {
-        print('❌ PROXY RESPONSE ERROR: ${response.statusCode}');
         client.close();
       }
     } catch (e) {
-      print('❌ PROXY FETCH FAILED: $e');
+      // Silent error handling
     }
 
     // Fallback to direct request
-    print('🔄 FALLING BACK TO DIRECT REQUEST');
     try {
       final response = await http.get(Uri.parse(url));
-      print('📡 DIRECT FALLBACK SUCCESS: ${response.statusCode}');
       return response.body;
     } catch (e) {
-      print('❌ DIRECT FALLBACK FAILED: $e');
       return null;
     }
   }

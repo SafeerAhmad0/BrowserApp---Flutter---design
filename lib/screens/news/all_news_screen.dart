@@ -56,7 +56,6 @@ class _AllNewsScreenState extends State<AllNewsScreen> {
         });
       }
     } catch (e) {
-      print('Error loading news: $e');
       if (mounted) {
         setState(() {
           _loadingNews = false;

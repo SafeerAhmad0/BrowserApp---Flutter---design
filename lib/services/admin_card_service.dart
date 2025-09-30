@@ -20,7 +20,6 @@ class AdminCardService {
   /// Load admin cards from Realtime Database
   static Future<List<AdminCard>> loadAdminCards() async {
     try {
-      print('🔄 Loading admin cards from Realtime Database...');
       final snapshot = await _database.child('admin_cards').get();
 
       _adminCards.clear();
@@ -43,18 +42,15 @@ class AdminCardService {
             final adminCard = AdminCard.fromJson(Map<String, dynamic>.from(cardData));
             if (adminCard.isActive) {
               _adminCards.add(adminCard);
-              print('✅ Loaded: ${adminCard.title}');
             }
           }
         }
       }
 
       _isLoaded = true;
-      print('🎯 Loaded ${_adminCards.length} admin cards from Realtime Database');
 
       return _adminCards;
     } catch (e) {
-      print('❌ Error loading admin cards: $e');
       _adminCards = [];
       _isLoaded = true;
       return [];
@@ -64,14 +60,11 @@ class AdminCardService {
   /// Save admin card to Realtime Database
   static Future<void> saveAdminCard(int cardNumber, AdminCard card) async {
     try {
-      print('💾 Saving admin card $cardNumber to Realtime Database...');
       await _database.child('admin_cards').child('card$cardNumber').set(card.toJson());
-      print('✅ Saved admin card $cardNumber to Realtime Database');
 
       // Reload cards to update the local list
       await loadAdminCards();
     } catch (e) {
-      print('❌ Failed to save admin card: $e');
       throw Exception('Failed to save admin card: $e');
     }
   }
@@ -80,12 +73,10 @@ class AdminCardService {
   static Future<void> deleteAdminCard(int cardNumber) async {
     try {
       await _database.child('admin_cards').child('card$cardNumber').remove();
-      print('🗑️ Deleted admin card $cardNumber from Realtime Database');
 
       // Reload cards to update the local list
       await loadAdminCards();
     } catch (e) {
-      print('❌ Failed to delete admin card: $e');
       throw Exception('Failed to delete admin card: $e');
     }
   }
@@ -116,7 +107,6 @@ class AdminCardService {
 
     // Return empty if no admin cards
     if (_adminCards.isEmpty) {
-      print('⚠️ No admin cards available');
       return positions;
     }
 
@@ -130,7 +120,6 @@ class AdminCardService {
 
       if (currentPosition <= totalNewsCount) {
         positions.add(currentPosition);
-        print('📍 Admin card ${(cardIndex % _adminCards.length) + 1} should appear after $currentPosition news articles');
       }
 
       cardIndex++;
@@ -172,11 +161,6 @@ class AdminCardService {
 
   /// Debug: Print current pattern
   static void debugPattern(int totalNews) {
-    print('🔍 DEBUG: Admin Card Pattern for $totalNews news articles');
     final positions = getAdminCardPositions(totalNews);
-    for (int i = 0; i < positions.length; i++) {
-      final card = getCardByIndex(i);
-      print('   Position ${positions[i]}: ${card?.title ?? "No card"}');
-    }
   }
 }

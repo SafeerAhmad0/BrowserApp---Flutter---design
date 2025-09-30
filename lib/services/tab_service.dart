@@ -67,7 +67,6 @@ class TabService {
       final List<dynamic> tabsList = json.decode(tabsJson);
       return tabsList.map((json) => TabData.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
-      print('Error loading tabs: $e');
       return [];
     }
   }
@@ -87,7 +86,7 @@ class TabService {
       await _saveTabs(tabs);
       await setActiveTab(newTab.id);
     } catch (e) {
-      print('Error creating new tab: $e');
+      // Silent error handling
     }
   }
 
@@ -105,7 +104,7 @@ class TabService {
         await _saveTabs(tabs);
       }
     } catch (e) {
-      print('Error updating tab: $e');
+      // Silent error handling
     }
   }
 
@@ -123,7 +122,7 @@ class TabService {
         await setActiveTab('');
       }
     } catch (e) {
-      print('Error closing tab: $e');
+      // Silent error handling
     }
   }
 
@@ -133,7 +132,7 @@ class TabService {
       await prefs.remove(_tabsKey);
       await prefs.remove(_activeTabKey);
     } catch (e) {
-      print('Error clearing all tabs: $e');
+      // Silent error handling
     }
   }
 
@@ -142,7 +141,6 @@ class TabService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_activeTabKey);
     } catch (e) {
-      print('Error getting active tab ID: $e');
       return null;
     }
   }
@@ -152,7 +150,7 @@ class TabService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_activeTabKey, tabId);
     } catch (e) {
-      print('Error setting active tab: $e');
+      // Silent error handling
     }
   }
 
@@ -169,7 +167,6 @@ class TabService {
         orElse: () => tabs.isNotEmpty ? tabs.first : throw Exception('No tabs available'),
       );
     } catch (e) {
-      print('Error getting active tab: $e');
       return null;
     }
   }
@@ -180,7 +177,7 @@ class TabService {
       final tabsJson = json.encode(tabs.map((tab) => tab.toJson()).toList());
       await prefs.setString(_tabsKey, tabsJson);
     } catch (e) {
-      print('Error saving tabs: $e');
+      // Silent error handling
     }
   }
 

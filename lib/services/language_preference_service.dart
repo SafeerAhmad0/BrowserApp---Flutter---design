@@ -33,7 +33,6 @@ class LanguagePreferenceService {
         }
       }
     } catch (e) {
-      print('Error loading language preference: $e');
       _currentLanguage = NewsLanguage.english;
     }
   }
@@ -44,7 +43,7 @@ class LanguagePreferenceService {
       await prefs.setString(_languageKey, language.code);
       _currentLanguage = language;
     } catch (e) {
-      print('Error saving language preference: $e');
+      // Silent error handling
     }
   }
 
