@@ -51,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
   WebViewController? _currentController;
   bool _isOnHomePage = true;
   String _currentUrl = '';
-  String _pageTitle = 'BlueX';
+  String _pageTitle = 'TORX';
   bool _isSearchFocused = false;
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 1;
@@ -629,7 +629,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _goHome() {
     setState(() {
       _isOnHomePage = true;
-      _pageTitle = 'BlueX';
+      _pageTitle = 'TORX';
       _currentUrl = '';
     });
   }
@@ -797,7 +797,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _tabs.clear();
                 _currentController = null;
                 _isOnHomePage = true;
-                _pageTitle = 'BlueX';
+                _pageTitle = 'TORX';
                 _currentUrl = '';
               }
             });
@@ -1108,7 +1108,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2196F3),
+        backgroundColor: const Color(0xFF121212), // Dark theme
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Row(
@@ -1250,11 +1250,11 @@ class _HomeScreenState extends State<HomeScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF2196F3),
-            Color(0xFF1976D2),
-            Colors.white,
+            Color(0xFF121212), // Dark
+            Color(0xFF2A2A2A), // Lighter dark
+            Color(0xFF424242), // Even lighter
           ],
-          stops: [0.0, 0.3, 1.0],
+          stops: [0.0, 0.5, 1.0],
         ),
       ),
       child: SingleChildScrollView(
@@ -1262,36 +1262,43 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // BlueX Header - Blue bold & small, X thin & big
+            // TORX Header with colored letters - TOR normal, X bold italic
             Container(
               margin: const EdgeInsets.symmetric(vertical: 10),
               child: RichText(
+                textAlign: TextAlign.center,
                 text: const TextSpan(
                   style: TextStyle(
-                    color: Colors.white,
+                    fontSize: 48,
+                    fontWeight: FontWeight.normal,
                     shadows: [
                       Shadow(
-                        offset: Offset(2, 2),
-                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                        blurRadius: 6,
                         color: Colors.black26,
                       ),
                     ],
                   ),
                   children: [
                     TextSpan(
-                      text: 'Blue',
-                      style: TextStyle(
-                        fontSize: 42,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
+                      text: 'T',
+                      style: TextStyle(color: Color(0xFF9C27B0)), // Purple
+                    ),
+                    TextSpan(
+                      text: 'O',
+                      style: TextStyle(color: Color(0xFF4CAF50)), // Green
+                    ),
+                    TextSpan(
+                      text: 'R',
+                      style: TextStyle(color: Color(0xFF2196F3)), // Blue
                     ),
                     TextSpan(
                       text: 'X',
                       style: TextStyle(
-                        fontSize: 68,
-                        fontWeight: FontWeight.w200,
-                        letterSpacing: -1,
+                        color: Color(0xFFE53935), // Red
+                        fontWeight: FontWeight.bold,
+                        fontStyle: FontStyle.italic,
+                        fontSize: 56, // Slightly bigger for emphasis
                       ),
                     ),
                   ],
@@ -1299,7 +1306,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Search Bar right after BlueX logo
+            // Search Bar right after TORX logo
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
               decoration: BoxDecoration(

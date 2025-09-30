@@ -29,7 +29,9 @@
       "Bash(firebase apps:list:*)",
       "Bash(firebase apps:sdkconfig:*)",
       "Bash(firebase firestore:rules:get:*)",
-      "Bash(firebase storage:rules:get:*)"
+      "Bash(firebase storage:rules:get:*)",
+      "Bash(copy:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

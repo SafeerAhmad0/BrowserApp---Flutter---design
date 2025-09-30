@@ -79,73 +79,91 @@ class _SplashScreenState extends State<SplashScreen>
             child: Opacity(
               opacity: _opacityAnimation.value == 0.0 ? 1.0 : _opacityAnimation.value,
               child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF64B5F6), // Light blue
-                      Color(0xFF2196F3), // Blue
-                      Color(0xFF1976D2), // Darker blue
-                      Color(0xFF0D47A1), // Deep blue
-                    ],
-                    stops: [0.0, 0.4, 0.8, 1.0],
-                  ),
-                ),
+                color: const Color(0xFF121212), // Dark background
+                // decoration: const BoxDecoration(
+                //   gradient: LinearGradient(
+                //     begin: Alignment.topLeft,
+                //     end: Alignment.bottomRight,
+                //     colors: [
+                //       Color(0xFF64B5F6), // Light blue
+                //       Color(0xFF2196F3), // Blue
+                //       Color(0xFF1976D2), // Darker blue
+                //       Color(0xFF0D47A1), // Deep blue
+                //     ],
+                //     stops: [0.0, 0.4, 0.8, 1.0],
+                //   ),
+                // ),
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // App Icon/Logo
+                      // App Icon/Logo - Fixed aspect ratio
                       Container(
                         width: 120,
                         height: 120,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(25),
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 25,
-                              offset: const Offset(0, 15),
+                              color: Colors.white.withOpacity(0.2),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.security,
-                          size: 70,
-                          color: Color(0xFF2196F3),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.asset(
+                            'assets/images/appLogo.jpg',
+                            fit: BoxFit.contain, // Changed from cover to contain
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.security,
+                                size: 70,
+                                color: Color(0xFF121212), // Color(0xFF2196F3) - Blue
+                              );
+                            },
+                          ),
                         ),
                       ),
                       const SizedBox(height: 30),
 
-                      // App Name with Rich Text for styling - Blue thick but small, X thin but big
+                      // App Name TORX with colored letters - TOR normal, X bold italic
                       RichText(
                         textAlign: TextAlign.center,
                         text: const TextSpan(
                           style: TextStyle(
-                            color: Colors.white,
+                            fontSize: 48,
+                            fontWeight: FontWeight.normal,
                             shadows: [
                               Shadow(
                                 offset: Offset(0, 3),
-                                blurRadius: 6,
+                                blurRadius: 8,
                                 color: Colors.black26,
                               ),
                             ],
                           ),
                           children: [
                             TextSpan(
-                              text: 'Blue',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                              ),
+                              text: 'T',
+                              style: TextStyle(color: Color(0xFF9C27B0)), // Purple
+                            ),
+                            TextSpan(
+                              text: 'O',
+                              style: TextStyle(color: Color(0xFF4CAF50)), // Green
+                            ),
+                            TextSpan(
+                              text: 'R',
+                              style: TextStyle(color: Color(0xFF2196F3)), // Blue
                             ),
                             TextSpan(
                               text: 'X',
                               style: TextStyle(
-                                fontSize: 40,
-                                fontWeight: FontWeight.w200,
+                                color: Color(0xFFE53935), // Red
+                                fontWeight: FontWeight.bold,
+                                fontStyle: FontStyle.italic,
+                                fontSize: 56, // Slightly bigger for emphasis
                               ),
                             ),
                           ],
