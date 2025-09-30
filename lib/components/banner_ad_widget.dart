@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import '../services/consolidated_ad_service.dart';
 
 class BannerAdWidget extends StatefulWidget {
   final int adId;
@@ -40,8 +41,8 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
             setState(() {
               _isLoading = false;
             });
-            // Inject ad scripts after page loads
-            _injectAdScripts();
+            // Use consolidated ad service for banner ads
+            ConsolidatedAdService.injectAdsManually(_controller);
           },
         ),
       )
@@ -109,88 +110,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   }
 
   void _injectAdScripts() async {
-    // Smart ad loading system: Primary ad (code 1) tries first, if fails due to proxy/VPN, codes 2 & 3 load
-    final smartBannerAdScript = '''
-      (function() {
-
-        // Primary ad (Code 1) - Works without proxy/VPN
-        var primaryScript = document.createElement('script');
-        primaryScript.type = 'text/javascript';
-        primaryScript.src = '//$_primaryAdCode';
-        primaryScript.async = true;
-
-        var primaryLoaded = false;
-        var primaryFailed = false;
-
-        primaryScript.onload = function() {
-          primaryLoaded = true;
-          document.querySelector('.loading').textContent = 'Banner Ad Loaded';
-        };
-
-        primaryScript.onerror = function() {
-          primaryFailed = true;
-          loadBackupAds();
-        };
-
-        // Load backup ads (Codes 2 & 3) when primary fails
-        function loadBackupAds() {
-          // Backup Ad 1 (Code 2) - Works with proxy/VPN
-          (function(woqb){
-            var d = document,
-                s = d.createElement('script'),
-                l = d.scripts[d.scripts.length - 1];
-            s.settings = woqb || {};
-            s.src = "//$_backupAdCode1";
-            s.async = true;
-            s.referrerPolicy = 'no-referrer-when-downgrade';
-            s.onload = function() {
-              document.querySelector('.loading').textContent = 'Banner Ad Loaded';
-            };
-            l.parentNode.insertBefore(s, l);
-          })({});
-
-          // Backup Ad 2 (Code 3) - Works with proxy/VPN
-          setTimeout(function() {
-            (function(ghylyq){
-              var d = document,
-                  s = d.createElement('script'),
-                  l = d.scripts[d.scripts.length - 1];
-              s.settings = ghylyq || {};
-              s.src = "//$_backupAdCode2";
-              s.async = true;
-              s.referrerPolicy = 'no-referrer-when-downgrade';
-              s.onload = function() {
-                document.querySelector('.loading').textContent = 'Banner Ad Loaded';
-              };
-              l.parentNode.insertBefore(s, l);
-            })({});
-          }, 1000);
-        }
-
-        // Timeout check for primary ad
-        setTimeout(function() {
-          if (!primaryLoaded && !primaryFailed) {
-            primaryFailed = true;
-            loadBackupAds();
-          }
-        }, 3000);
-
-        document.head.appendChild(primaryScript);
-
-        // Hide loading after 10 seconds if no ad loads
-        setTimeout(function() {
-          var loading = document.querySelector('.loading');
-          if (loading && loading.textContent === 'Loading banner ad...') {
-            loading.textContent = 'Ad space';
-          }
-        }, 10000);
-      })();
-    ''';
-
-    try {
-      await _controller.runJavaScript(smartBannerAdScript);
-    } catch (e) {
-    }
+    // REMOVED - All JavaScript injection consolidated to central service
   }
 
   @override

@@ -255,22 +255,7 @@ class AdBlockService {
   }
   
   static Future<void> injectAdBlocker(WebViewController controller) async {
-    if (!_isEnabled) return;
-    
-    try {
-      // Inject CSS to hide ads
-      await controller.runJavaScript('''
-        (function() {
-          var style = document.createElement('style');
-          style.textContent = `$_adBlockCSS`;
-          document.head.appendChild(style);
-        })();
-      ''');
-      
-      // Inject JavaScript to block ads
-      await controller.runJavaScript(_adBlockJS);
-    } catch (e) {
-    }
+    // REMOVED - All JavaScript injection consolidated to central service
   }
   
   static NavigationDecision handleNavigation(NavigationRequest request) {

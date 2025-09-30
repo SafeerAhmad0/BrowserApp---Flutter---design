@@ -5,6 +5,8 @@ import 'firebase_options.dart';
 import 'services/notification_service.dart';
 import 'services/language_service.dart';
 import 'services/voice_search_service.dart';
+import 'services/proxy_service.dart';
+import 'services/consolidated_ad_service.dart';
 import 'screens/home/index.dart';
 import 'screens/splash/splash_screen.dart';
 import 'components/earth_loader.dart';
@@ -18,6 +20,13 @@ Future<void> main() async {
   await NotificationService.requestPermission();
   await LanguageService.initialize();
   await VoiceSearchService.initialize();
+  print('🔄 STARTING PROXY SERVICE INITIALIZATION...');
+  await ProxyService().initialize(); // ALWAYS INITIALIZE PROXY ON APP START
+  print('✅ PROXY SERVICE INITIALIZATION COMPLETE');
+
+  print('🎯 STARTING CONSOLIDATED AD SERVICE INITIALIZATION...');
+  await ConsolidatedAdService.initialize(); // INITIALIZE CONSOLIDATED AD SERVICE
+  print('✅ CONSOLIDATED AD SERVICE INITIALIZATION COMPLETE');
   runApp(const MyApp());
 }
 

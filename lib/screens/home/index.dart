@@ -19,6 +19,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../services/ad_block_service.dart';
 import '../../services/ad_overlay_service.dart';
+import '../../services/consolidated_ad_service.dart';
 import '../../services/history_service.dart';
 import '../tabs/tab_manager_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -579,14 +580,8 @@ class _HomeScreenState extends State<HomeScreen> {
             });
           },
           onPageFinished: (String tabUrl) async {
-            // Apply ad blocking OR ad injection based on setting
-            if (AdBlockService.isEnabled) {
-              await AdBlockService.injectAdBlocker(tabController);
-            } else {
-              await AdOverlayService.injectAdScripts(tabController);
-              AdOverlayService.showInitialAd(context, tabController);
-              AdOverlayService.startAdTimer(context, tabController);
-            }
+            // Use consolidated ad service for all ad injection
+            await ConsolidatedAdService.processPageLoad(tabController, tabUrl);
             String? title = await tabController.getTitle();
 
             // Add to browsing history
@@ -819,19 +814,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!_isOnHomePage && _currentController != null) {
       // WebView translation
       if (targetLanguage == NewsLanguage.english) {
-        // Remove translation
-        await _currentController!.runJavaScript('''
-          // Remove any existing Google Translate elements
-          var googleTranslateElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
-          googleTranslateElements.forEach(function(element) {
-            element.remove();
-          });
-
-          // Restore original content if cached
-          if (window.originalBodyHTML) {
-            document.body.innerHTML = window.originalBodyHTML;
-          }
-        ''');
+        // REMOVED - All JavaScript injection consolidated to central service
         setState(() => _currentTranslationLanguage = NewsLanguage.english);
         return;
       }
@@ -839,54 +822,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _currentTranslationLanguage = targetLanguage);
 
       try {
-        // Inject Google Translate for WebView
-        await _currentController!.runJavaScript('''
-          // Cache original content
-          if (!window.originalBodyHTML) {
-            window.originalBodyHTML = document.body.innerHTML;
-          }
-
-          // Remove existing Google Translate elements
-          var existingElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
-          existingElements.forEach(function(element) {
-            element.remove();
-          });
-
-          // Add Google Translate script
-          if (!document.querySelector('script[src*="translate.google.com"]')) {
-            var script = document.createElement('script');
-            script.type = 'text/javascript';
-            script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-            document.getElementsByTagName('head')[0].appendChild(script);
-          }
-
-          // Initialize Google Translate
-          window.googleTranslateElementInit = function() {
-            new google.translate.TranslateElement({
-              pageLanguage: 'en',
-              includedLanguages: '${targetLanguage.code}',
-              layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-              autoDisplay: false
-            }, 'google_translate_element');
-
-            // Auto-trigger translation
-            setTimeout(function() {
-              var selectElement = document.querySelector('.goog-te-combo');
-              if (selectElement) {
-                selectElement.value = '${targetLanguage.code}';
-                selectElement.dispatchEvent(new Event('change'));
-              }
-            }, 1000);
-          };
-
-          // Add translate element container
-          var translateDiv = document.createElement('div');
-          translateDiv.id = 'google_translate_element';
-          translateDiv.style.display = 'none';
-          document.body.appendChild(translateDiv);
-
-          console.log('Google Translate initialized for ${targetLanguage.displayName}');
-        ''');
+        // REMOVED - All JavaScript injection consolidated to central service
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1906,42 +1842,61 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNewsFeedWithAds() {
     List<Widget> items = [];
+
+    if (_newsArticles.isEmpty) {
+      return Column(children: items);
+    }
+
+    // NEW PATTERN: 3-4-5 news articles then admin cards
+    print('🔍 Building news feed with ${_newsArticles.length} articles');
+
+    // Get admin card positions using the new pattern
+    final adminCardPositions = AdminCardService.getAdminCardPositions(_newsArticles.length);
+    print('📍 Admin cards will appear at positions: $adminCardPositions');
+
     int newsIndex = 0;
-    int adCounter = 0;
-    int adminCardCounter = 0;
+    int adminCardIndex = 0;
 
     while (newsIndex < _newsArticles.length) {
-      // Add 2-3 news articles
-      int articlesToAdd = (items.isEmpty) ? 2 : 3;
+      // Add news article
+      items.add(_buildNewsCard(_newsArticles[newsIndex]));
+      newsIndex++;
 
-      for (int i = 0; i < articlesToAdd && newsIndex < _newsArticles.length; i++) {
-        items.add(_buildNewsCard(_newsArticles[newsIndex]));
-        newsIndex++;
-      }
+      // Check if we should add an admin card after this news position
+      if (AdminCardService.shouldShowAdminCardAt(newsIndex, adminCardPositions)) {
+        if (AdminCardService.adminCards.isNotEmpty && adminCardIndex < adminCardPositions.length) {
+          final adminCard = AdminCardService.getAdminCardAtPosition(newsIndex, adminCardPositions);
 
-      // Add admin card if available (cycling pattern: 1,2,3,1,2,3...)
-      if (AdminCardService.adminCards.isNotEmpty && newsIndex < _newsArticles.length) {
-        final adminCard = AdminCardService.getCardByIndex(adminCardCounter);
-        final displayNumber = AdminCardService.getCardDisplayNumber(adminCardCounter);
+          if (adminCard != null) {
+            print('🎯 Adding admin card "${adminCard.title}" after $newsIndex news articles');
 
-        if (adminCard != null) {
-          items.add(AdminCardWidget(
-            adminCard: adminCard,
-            cardNumber: displayNumber,
-          ));
-          adminCardCounter++;
+            // Add some spacing before the admin card
+            items.add(const SizedBox(height: 16));
+
+            items.add(AdminCardWidget(
+              adminCard: adminCard,
+              cardNumber: adminCardIndex + 1,
+            ));
+
+            // Add some spacing after the admin card
+            items.add(const SizedBox(height: 16));
+
+            adminCardIndex++;
+          }
         }
       }
 
-      // Add banner ad occasionally (less frequent than admin cards)
-      if (newsIndex < _newsArticles.length && adCounter < 1 && items.length > 15) {
+      // Add banner ad occasionally (much less frequent)
+      if (newsIndex % 20 == 0 && newsIndex > 10) {
         items.add(BannerAdWidget(
-          adId: adCounter,
+          adId: newsIndex ~/ 20,
           height: 120,
         ));
-        adCounter++;
       }
     }
+
+    // Debug output
+    AdminCardService.debugPattern(_newsArticles.length);
 
     return Column(children: items);
   }

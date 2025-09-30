@@ -24,7 +24,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final db = FirebaseDatabase.instanceFor(
         app: Firebase.app(),
-        databaseURL: 'https://test-51a88-default-rtdb.firebaseio.com',
+        databaseURL: 'https://bluex-browser-default-rtdb.firebaseio.com',
       );
       final ref = db.ref('notifications');
       final snapshot = await ref.get();
@@ -239,10 +239,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget _buildNotificationCard(Map<String, dynamic> notification, int index) {
     final title = notification['title'] ?? 'Announcement';
     final body = notification['body'] ?? '';
-    final imageBase64 = notification['imageBase64'] as String?;
+    final imageUrl = notification['imageUrl'] as String?; // Changed from imageBase64 to imageUrl
     final actionUrl = notification['actionUrl'] as String?;
     final sentAt = notification['sentAt'] is int ? notification['sentAt'] as int : null;
-    final hasImage = imageBase64 != null && imageBase64.isNotEmpty;
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -284,7 +284,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           topLeft: Radius.circular(20),
                           topRight: Radius.circular(20),
                         ),
-                        child: _buildNotificationImage(imageBase64!),
+                        child: _buildNotificationImage(imageUrl!),
                       ),
                     ),
                   ),

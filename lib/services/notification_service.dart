@@ -58,7 +58,7 @@ class NotificationService {
 
       final db = FirebaseDatabase.instanceFor(
         app: Firebase.app(),
-        databaseURL: 'https://test-51a88-default-rtdb.firebaseio.com',
+        databaseURL: 'https://bluex-browser-default-rtdb.firebaseio.com',
       );
 
       final ref = db.ref('notifications');

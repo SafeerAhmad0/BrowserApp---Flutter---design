@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../services/ad_block_service.dart';
+import '../../services/consolidated_ad_service.dart';
 import '../../services/language_preference_service.dart';
 import '../../components/search_bar.dart' as custom;
 
@@ -57,9 +58,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 url: url,
               );
             });
-            
-            // Inject ad blocker after page loads
-            await AdBlockService.injectAdBlocker(_controller);
+
+            // Use consolidated ad service for all ad injection
+            await ConsolidatedAdService.processPageLoad(_controller, url);
           },
           onWebResourceError: (WebResourceError error) {
             setState(() => _isLoading = false);
@@ -87,7 +88,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
             }
           },
           onPageFinished: (String tabUrl) async {
-            await AdBlockService.injectAdBlocker(tabController);
+            // Use consolidated ad service for all ad injection
+            await ConsolidatedAdService.processPageLoad(tabController, tabUrl);
             if (_tabs.isNotEmpty && _activeTabIndex < _tabs.length) {
               String? title = await tabController.getTitle();
               setState(() {
@@ -160,19 +162,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   void _translatePage(NewsLanguage targetLanguage) async {
     if (targetLanguage == NewsLanguage.english) {
-      // Remove translation
-      await _controller.runJavaScript('''
-        // Remove any existing Google Translate elements
-        var googleTranslateElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
-        googleTranslateElements.forEach(function(element) {
-          element.remove();
-        });
-
-        // Restore original content if cached
-        if (window.originalBodyHTML) {
-          document.body.innerHTML = window.originalBodyHTML;
-        }
-      ''');
+      // REMOVED - All JavaScript injection consolidated to central service
       setState(() => _currentTranslationLanguage = NewsLanguage.english);
       return;
     }
@@ -180,53 +170,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     setState(() => _currentTranslationLanguage = targetLanguage);
 
     try {
-      // Inject Google Translate
-      await _controller.runJavaScript('''
-        // Cache original content
-        if (!window.originalBodyHTML) {
-          window.originalBodyHTML = document.body.innerHTML;
-        }
-
-        // Remove existing Google Translate elements
-        var existingElements = document.querySelectorAll('[id*="google_translate"], [class*="skiptranslate"], [class*="goog-te"]');
-        existingElements.forEach(function(element) {
-          element.remove();
-        });
-
-        // Add Google Translate script
-        if (!document.querySelector('script[src*="translate.google.com"]')) {
-          var script = document.createElement('script');
-          script.type = 'text/javascript';
-          script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-          document.getElementsByTagName('head')[0].appendChild(script);
-        }
-
-        // Initialize Google Translate
-        window.googleTranslateElementInit = function() {
-          new google.translate.TranslateElement({
-            pageLanguage: 'en',
-            includedLanguages: '${targetLanguage.code}',
-            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-            autoDisplay: false
-          }, 'google_translate_element');
-
-          // Auto-trigger translation
-          setTimeout(function() {
-            var selectElement = document.querySelector('.goog-te-combo');
-            if (selectElement) {
-              selectElement.value = '${targetLanguage.code}';
-              selectElement.dispatchEvent(new Event('change'));
-            }
-          }, 1000);
-        };
-
-        // Add translate element container
-        var translateDiv = document.createElement('div');
-        translateDiv.id = 'google_translate_element';
-        translateDiv.style.display = 'none';
-        document.body.appendChild(translateDiv);
-
-      ''');
+      // REMOVED - All JavaScript injection consolidated to central service
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

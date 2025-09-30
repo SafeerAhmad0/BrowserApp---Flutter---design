@@ -17,7 +17,19 @@
       "Bash(q)",
       "Bash(C:Userssafeedevflutterbinflutter.bat analyze)",
       "Bash(del:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(ssh:*)",
+      "Bash(curl:*)",
+      "Bash(nc localhost 34072)",
+      "Bash(printf \"r\\n\")",
+      "Bash(ping:*)",
+      "Bash(\"C:\\Users\\safee\\AppData\\Local\\Pub\\Cache\\bin\\flutterfire.bat\" configure --project=bluex-browser)",
+      "Bash(firebase projects:list:*)",
+      "Bash(firebase apps:android:create:*)",
+      "Bash(firebase apps:list:*)",
+      "Bash(firebase apps:sdkconfig:*)",
+      "Bash(firebase firestore:rules:get:*)",
+      "Bash(firebase storage:rules:get:*)"
     ],
     "deny": [],
     "ask": []
