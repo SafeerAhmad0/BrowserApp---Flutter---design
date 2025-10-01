@@ -4,14 +4,14 @@ import 'dart:convert';
 
 class AdminCard {
   final String title;
-  final String description;
+  final String url;
   final String imageUrl;
   final bool isActive;
   final DateTime? updatedAt;
 
   AdminCard({
     required this.title,
-    required this.description,
+    required this.url,
     required this.imageUrl,
     this.isActive = true,
     this.updatedAt,
@@ -20,7 +20,7 @@ class AdminCard {
   factory AdminCard.fromJson(Map<dynamic, dynamic> json) {
     return AdminCard(
       title: json['title'] ?? '',
-      description: json['description'] ?? '',
+      url: json['url'] ?? '',
       imageUrl: json['imageUrl'] ?? '',
       isActive: json['isActive'] ?? true,
       updatedAt: json['updatedAt'] != null
@@ -32,7 +32,7 @@ class AdminCard {
   Map<String, dynamic> toJson() {
     return {
       'title': title,
-      'description': description,
+      'url': url,
       'imageUrl': imageUrl,
       'isActive': isActive,
       'updatedAt': updatedAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
@@ -62,18 +62,22 @@ class AdminCardWidget extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            // You can add action here if needed
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Admin Card ${cardNumber + 1} tapped'),
-                duration: const Duration(seconds: 1),
-              ),
-            );
+            // Open URL when tapped
+            if (adminCard.url.isNotEmpty) {
+              // You'll need to import web_view_screen or use a URL launcher
+              // For now, show a snackbar - integrate with your navigation later
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Opening: ${adminCard.url}'),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
+            }
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Image Section
+              // Image Section (clickable thumbnail)
               if (adminCard.imageUrl.isNotEmpty)
                 ClipRRect(
                   borderRadius: const BorderRadius.only(
@@ -139,69 +143,19 @@ class AdminCardWidget extends StatelessWidget {
                   ),
                 ),
 
-              // Content Section
+              // Title only section
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Admin badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2196F3).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.admin_panel_settings,
-                            size: 14,
-                            color: Color(0xFF2196F3),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Admin Card ${cardNumber + 1}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF2196F3),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Title
-                    Text(
-                      adminCard.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Description
-                    Text(
-                      adminCard.description,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        height: 1.4,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                padding: const EdgeInsets.all(12.0),
+                child: Text(
+                  adminCard.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.0,
+                    color: Colors.black87,
+                    height: 1.3,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

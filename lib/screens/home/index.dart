@@ -21,6 +21,7 @@ import '../../services/ad_block_service.dart';
 import '../../services/ad_overlay_service.dart';
 import '../../services/consolidated_ad_service.dart';
 import '../../services/history_service.dart';
+import '../../services/tab_service.dart';
 import '../tabs/tab_manager_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../models/tab.dart';
@@ -62,9 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeLanguageService();
-    _loadNews();
-    _loadAdminCards();
+    _initializeApp();
     _checkAdminStatus();
     _setupScrollListener();
 
@@ -76,8 +75,84 @@ class _HomeScreenState extends State<HomeScreen> {
     // Removed automatic notifications slideshow popup
   }
 
-  Future<void> _initializeLanguageService() async {
+  Future<void> _initializeApp() async {
+    // Load language preference first
     await LanguagePreferenceService.loadLanguagePreference();
+
+    // Set current translation language to match the loaded preference
+    setState(() {
+      _currentTranslationLanguage = LanguagePreferenceService.currentLanguage;
+    });
+
+    // Load saved tabs from storage
+    await _loadSavedTabs();
+
+    // Load admin cards
+    await _loadAdminCards();
+
+    // Load news with the correct language
+    await _loadNews();
+  }
+
+  Future<void> _loadSavedTabs() async {
+    try {
+      final savedTabs = await TabService.getAllTabs();
+      if (savedTabs.isNotEmpty) {
+        // Load tabs in background but DON'T open them
+        // Just recreate the tab data without switching to them
+        for (final tabData in savedTabs) {
+          late WebViewController tabController;
+
+          tabController = WebViewController()
+            ..setJavaScriptMode(JavaScriptMode.unrestricted)
+            ..setNavigationDelegate(
+              NavigationDelegate(
+                onNavigationRequest: (NavigationRequest request) {
+                  return AdBlockService.handleNavigation(request);
+                },
+                onPageStarted: (String tabUrl) {
+                  // Don't update UI, just load in background
+                },
+                onPageFinished: (String tabUrl) async {
+                  await ConsolidatedAdService.processPageLoad(tabController, tabUrl);
+                  String? title = await tabController.getTitle();
+
+                  // Update tab in storage
+                  final tabIndex = _tabs.indexWhere((t) => t.url == tabData.url);
+                  if (tabIndex != -1) {
+                    setState(() {
+                      _tabs[tabIndex] = _tabs[tabIndex].copyWith(
+                        title: title ?? 'Untitled',
+                        url: tabUrl,
+                      );
+                    });
+                    TabService.updateTab(_tabs[tabIndex].id, url: tabUrl, title: title ?? 'Untitled');
+                  }
+                },
+                onWebResourceError: (WebResourceError error) {},
+              ),
+            )
+            ..loadRequest(Uri.parse(tabData.url));
+
+          setState(() {
+            _tabs.add(BrowserTab(
+              id: tabData.id,
+              title: tabData.title,
+              url: tabData.url,
+              controller: tabController,
+            ));
+          });
+        }
+
+        // Stay on home page - don't switch to any tab
+        setState(() {
+          _isOnHomePage = true;
+          _currentController = null;
+        });
+      }
+    } catch (e) {
+      print('Error loading saved tabs: $e');
+    }
   }
 
   @override
@@ -147,16 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _currentPage = 1;
         });
 
-        // Show success message if translated
-        if (targetLanguage != NewsLanguage.english && articles.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ News translated to ${targetLanguage.displayName}'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        // Removed translation success message
       }
     } catch (e) {
       if (mounted) {
@@ -230,16 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoadingMoreNews = false;
         });
 
-        // Show success message if translated
-        if (targetLanguage != NewsLanguage.english && finalArticles.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ ${finalArticles.length} more articles translated to ${targetLanguage.displayName}'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        // Removed translation success message
       }
     } catch (e) {
       if (mounted) {
@@ -597,10 +654,14 @@ class _HomeScreenState extends State<HomeScreen> {
               _currentUrl = tabUrl;
               _pageTitle = title ?? 'Untitled';
               if (_tabs.isNotEmpty && _activeTabIndex < _tabs.length) {
-                _tabs[_activeTabIndex] = _tabs[_activeTabIndex].copyWith(
+                final currentTab = _tabs[_activeTabIndex];
+                _tabs[_activeTabIndex] = currentTab.copyWith(
                   title: _pageTitle,
                   url: tabUrl,
                 );
+
+                // Update tab in storage
+                TabService.updateTab(currentTab.id, url: tabUrl, title: _pageTitle);
               }
             });
 
@@ -613,17 +674,21 @@ class _HomeScreenState extends State<HomeScreen> {
       ..loadRequest(Uri.parse(url));
 
     setState(() {
-      _tabs.add(BrowserTab(
+      final newTab = BrowserTab(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: 'Loading...',
         url: url,
         controller: tabController,
-      ));
+      );
+      _tabs.add(newTab);
       _activeTabIndex = _tabs.length - 1;
       _currentController = tabController;
       _isOnHomePage = false;
       _currentUrl = url;
     });
+
+    // Save tab to storage
+    TabService.createNewTab(url, 'Loading...');
   }
 
   void _goHome() {
@@ -741,25 +806,70 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _clearCache() {
-    if (_currentController != null) {
-      _currentController!.clearCache();
-      _currentController!.clearLocalStorage();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Cache and local storage cleared!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
+  void _clearCache() async {
+    // Show confirmation dialog
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Clear Everything?'),
+          ],
         ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ No active page to clear cache'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
+        content: const Text(
+          'This will clear:\n• All browsing history\n• All open tabs\n• Cache and local storage\n\nThis action cannot be undone.',
         ),
-      );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldClear == true) {
+      // Clear all history
+      await HistoryService.clearAllHistory();
+
+      // Clear all tabs from storage
+      await TabService.clearAllTabs();
+
+      // Clear all tabs from UI
+      setState(() {
+        _tabs.clear();
+        _currentController = null;
+        _isOnHomePage = true;
+        _pageTitle = 'TORX';
+        _currentUrl = '';
+      });
+
+      // Clear cache if there was an active controller
+      if (_currentController != null) {
+        _currentController!.clearCache();
+        _currentController!.clearLocalStorage();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ All history, tabs, and cache cleared!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -770,40 +880,61 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context) => TabManagerScreen(
           tabs: _tabs,
           onTabSelected: (index) {
-            // Close tab manager and switch to selected tab
-            Navigator.pop(context);
-            setState(() {
-              _activeTabIndex = index;
-              _currentController = _tabs[index].controller;
-              _currentUrl = _tabs[index].url;
-              _pageTitle = _tabs[index].title;
-              _isOnHomePage = false;
-            });
+            // Switch to selected tab
+            if (index >= 0 && index < _tabs.length) {
+              Navigator.pop(context); // Close tab manager first
+
+              setState(() {
+                _activeTabIndex = index;
+                _currentController = _tabs[index].controller;
+                _currentUrl = _tabs[index].url;
+                _pageTitle = _tabs[index].title;
+                _isOnHomePage = false;
+              });
+            }
           },
           onTabClosed: (index) {
-            // Keep tab manager open, just update the tabs
-            setState(() {
-              if (_tabs.length > 1) {
-                _tabs.removeAt(index);
-                if (_activeTabIndex >= _tabs.length) {
-                  _activeTabIndex = _tabs.length - 1;
+            // Delete tab and update state WITHOUT closing tab manager
+            if (index >= 0 && index < _tabs.length) {
+              setState(() {
+                if (_tabs.length > 1) {
+                  final tabToRemove = _tabs[index];
+                  _tabs.removeAt(index);
+
+                  // Delete tab from storage
+                  TabService.closeTab(tabToRemove.id);
+
+                  // Adjust active tab index if needed
+                  if (_activeTabIndex >= _tabs.length) {
+                    _activeTabIndex = _tabs.length - 1;
+                  }
+                  if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.length) {
+                    _currentController = _tabs[_activeTabIndex].controller;
+                    _currentUrl = _tabs[_activeTabIndex].url;
+                    _pageTitle = _tabs[_activeTabIndex].title;
+                  }
+                } else {
+                  // Last tab - close it and go home
+                  final tabToRemove = _tabs[0];
+                  _tabs.clear();
+
+                  // Delete tab from storage
+                  TabService.closeTab(tabToRemove.id);
+
+                  _currentController = null;
+                  _isOnHomePage = true;
+                  _pageTitle = 'TORX';
+                  _currentUrl = '';
+
+                  // Close tab manager since no tabs left
+                  Navigator.pop(context);
                 }
-                if (_activeTabIndex >= 0) {
-                  _currentController = _tabs[_activeTabIndex].controller;
-                  _currentUrl = _tabs[_activeTabIndex].url;
-                  _pageTitle = _tabs[_activeTabIndex].title;
-                }
-              } else {
-                _tabs.clear();
-                _currentController = null;
-                _isOnHomePage = true;
-                _pageTitle = 'TORX';
-                _currentUrl = '';
-              }
-            });
+              });
+            }
           },
           onNewTab: () {
             _addNewTab('https://www.google.com');
+            Navigator.pop(context); // Close tab manager after creating new tab
           },
         ),
       ),
@@ -996,46 +1127,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-            // Ad Block toggle
-            ListTile(
-              leading: Icon(
-                AdBlockService.isEnabled ? Icons.shield : Icons.shield_outlined,
-                color: AdBlockService.isEnabled ? Colors.green : Colors.grey,
-              ),
-              title: const Text('Ad Block'),
-              trailing: Switch(
-                value: AdBlockService.isEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    AdBlockService.setEnabled(value);
-                    AdOverlayService.setAdBlockEnabled(value);
-                  });
-
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        value ? 'Ad Block enabled' : 'Ad Block disabled',
-                      ),
-                      backgroundColor: value ? Colors.green : Colors.orange,
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // Ad Block Settings
-            ListTile(
-              leading: const Icon(Icons.settings, color: Color(0xFF2196F3)),
-              title: const Text('Ad Block Settings'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Navigate to ad block settings
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ad Block settings coming soon!')),
-                );
-              },
-            ),
 
             // View History
             ListTile(
@@ -1106,8 +1197,57 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) async {
+        if (didPop) return;
+
+        // If browsing a page and can go back in webview history
+        if (!_isOnHomePage && _currentController != null) {
+          final canGoBack = await _currentController!.canGoBack();
+          if (canGoBack) {
+            await _currentController!.goBack();
+            return;
+          } else {
+            // No more back history in webview, go to home page
+            _goHome();
+            return;
+          }
+        }
+
+        // If on home page, exit the app
+        if (_isOnHomePage) {
+          // Show exit confirmation
+          final shouldExit = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Exit App?'),
+              content: const Text('Do you want to exit TORX Browser?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Exit'),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldExit == true) {
+            // Exit the app
+            Navigator.of(context).pop(true);
+          }
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
         backgroundColor: const Color(0xFF121212), // Dark theme
         elevation: 0,
         automaticallyImplyLeading: false,
@@ -1120,61 +1260,106 @@ class _HomeScreenState extends State<HomeScreen> {
               tooltip: 'Home',
             ),
 
-            // Current URL/Search bar display
+            // Current URL/Search bar display (or spacer on home page)
             Expanded(
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 8),
-                child: _isOnHomePage
-                  ? TopSearchBar(
-                      key: _searchBarKey,
-                      hintText: 'Search Google or type a URL',
-                      onFocusChanged: (hasFocus) {
-                        setState(() {
-                          _isSearchFocused = hasFocus;
-                        });
-                      },
-                      onSearch: (query) {
-                        String url = query.toLowerCase();
-                        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                          if (Uri.tryParse(url)?.hasScheme ?? false) {
-                            url = 'https://$url';
-                          } else {
-                            url = 'https://www.google.com/search?q=${Uri.encodeComponent(query)}';
-                          }
-                        }
-                        _addNewTab(url);
-                      },
-                    )
-                  : Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(left: 12),
-                            child: Icon(Icons.language, color: Color(0xFF2196F3), size: 18),
+                child: !_isOnHomePage
+                  ? GestureDetector(
+                      onTap: () {
+                        // Show dialog with editable URL when tapped
+                        final urlController = TextEditingController(text: _currentUrl);
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Enter URL or search'),
+                            content: TextField(
+                              controller: urlController,
+                              autofocus: true,
+                              decoration: const InputDecoration(
+                                hintText: 'Enter URL or search term',
+                                border: OutlineInputBorder(),
+                              ),
+                              onSubmitted: (value) {
+                                Navigator.pop(context);
+                                String url = value.toLowerCase();
+                                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                                  if (Uri.tryParse(url)?.hasScheme ?? false) {
+                                    url = 'https://$url';
+                                  } else {
+                                    url = 'https://www.google.com/search?q=${Uri.encodeComponent(value)}';
+                                  }
+                                }
+                                if (_currentController != null) {
+                                  _currentController!.loadRequest(Uri.parse(url));
+                                } else {
+                                  _addNewTab(url);
+                                }
+                              },
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  String url = urlController.text.toLowerCase();
+                                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                                    if (Uri.tryParse(url)?.hasScheme ?? false) {
+                                      url = 'https://$url';
+                                    } else {
+                                      url = 'https://www.google.com/search?q=${Uri.encodeComponent(urlController.text)}';
+                                    }
+                                  }
+                                  if (_currentController != null) {
+                                    _currentController!.loadRequest(Uri.parse(url));
+                                  } else {
+                                    _addNewTab(url);
+                                  }
+                                },
+                                child: const Text('Go'),
+                              ),
+                            ],
                           ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text(
-                                _currentUrl.isNotEmpty ? _formatUrl(_currentUrl) : 'Loading...',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
+                        );
+                      },
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(left: 12),
+                              child: Icon(Icons.language, color: Color(0xFF2196F3), size: 18),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
+                                  _currentUrl.isNotEmpty ? _formatUrl(_currentUrl) : 'Loading...',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
+                            const Padding(
+                              padding: EdgeInsets.only(right: 12),
+                              child: Icon(Icons.edit, color: Color(0xFF2196F3), size: 16),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    )
+                  : const SizedBox(), // Empty space on home page
               ),
             ),
 
@@ -1239,7 +1424,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: _isOnHomePage ? _buildHomePage() : _buildWebViewPage(),
-      bottomNavigationBar: !_isOnHomePage ? _buildBottomNavigationBar() : null,
+      ),
     );
   }
 
@@ -1257,10 +1442,18 @@ class _HomeScreenState extends State<HomeScreen> {
           stops: [0.0, 0.5, 1.0],
         ),
       ),
-      child: SingleChildScrollView(
-        controller: _scrollController,
-        physics: const BouncingScrollPhysics(),
-        child: Column(
+      child: RefreshIndicator(
+        onRefresh: () async {
+          // Reload news when pulled down
+          await _loadNews();
+          await _loadAdminCards();
+        },
+        color: const Color(0xFF2196F3),
+        backgroundColor: Colors.white,
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
           children: [
             // TORX Header with colored letters - TOR normal, X bold italic
             Container(
@@ -1355,6 +1548,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 90,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
                     _buildQuickAccessIconWithAsset(
                       'ChatGPT',
@@ -1612,6 +1806,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Extra padding at bottom for better scrolling
             const SizedBox(height: 50),
           ],
+        ),
         ),
       ),
     );
@@ -1893,13 +2088,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      // Add banner ad occasionally (much less frequent)
-      if (newsIndex % 20 == 0 && newsIndex > 10) {
-        items.add(BannerAdWidget(
-          adId: newsIndex ~/ 20,
-          height: 120,
-        ));
-      }
+      // Banner ads removed - using admin cards instead
     }
 
     // Debug output
@@ -1918,7 +2107,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.symmetric(
           horizontal: 16.0,
@@ -1926,136 +2115,58 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.08),
               offset: const Offset(0, 2),
               blurRadius: 8,
             ),
           ],
-          border: Border.all(
-            color: const Color(0xFF2196F3).withOpacity(0.1),
-            width: 1,
-          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Thumbnail with YouTube aspect ratio (16:9)
             if (article.urlToImage != null)
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(15.0),
+                  top: Radius.circular(12.0),
                 ),
-                child: Image.network(
-                  article.urlToImage!,
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const SizedBox.shrink();
-                  },
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(
+                    article.urlToImage!,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey[200],
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_not_supported,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
+            // Title only section
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    article.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16.0,
-                      color: Color(0xFF1976D2),
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  Text(
-                    article.description,
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 14.0,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 12.0),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2196F3).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              article.source,
-                              style: const TextStyle(
-                                color: Color(0xFF1976D2),
-                                fontSize: 11.0,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          if (article.isTranslated) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.green.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.translate,
-                                    size: 10,
-                                    color: Colors.green[700],
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    article.language.displayName,
-                                    style: TextStyle(
-                                      color: Colors.green[700],
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      Flexible(
-                        child: Text(
-                          article.author ?? '',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 11.0,
-                          ),
-                          textAlign: TextAlign.end,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              padding: const EdgeInsets.all(12.0),
+              child: Text(
+                article.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14.0,
+                  color: Colors.black87,
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

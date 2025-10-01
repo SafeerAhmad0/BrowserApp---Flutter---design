@@ -76,9 +76,12 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/appLogo.jpg"
+  image_path: "assets/images/image-1024x1024.jpg"
   adaptive_icon_background: "#ffffff"
-  adaptive_icon_foreground: "assets/images/appLogo.jpg"
+  adaptive_icon_foreground: "assets/images/image-1024x1024.jpg"
+  min_sdk_android: 21
+  # Add padding to prevent stretching
+  adaptive_icon_padding: 0.15
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

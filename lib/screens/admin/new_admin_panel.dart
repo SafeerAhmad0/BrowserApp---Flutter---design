@@ -30,17 +30,17 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
   final List<Map<String, TextEditingController>> _cardControllers = [
     {
       'title': TextEditingController(),
-      'description': TextEditingController(),
+      'url': TextEditingController(),
       'imageUrl': TextEditingController(),
     },
     {
       'title': TextEditingController(),
-      'description': TextEditingController(),
+      'url': TextEditingController(),
       'imageUrl': TextEditingController(),
     },
     {
       'title': TextEditingController(),
-      'description': TextEditingController(),
+      'url': TextEditingController(),
       'imageUrl': TextEditingController(),
     },
   ];
@@ -67,7 +67,7 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
 
     for (var cardController in _cardControllers) {
       cardController['title']?.dispose();
-      cardController['description']?.dispose();
+      cardController['url']?.dispose();
       cardController['imageUrl']?.dispose();
     }
     super.dispose();
@@ -85,7 +85,7 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
         if (i < adminCards.length) {
           final adminCard = adminCards[i];
           _cardControllers[i]['title']?.text = adminCard.title;
-          _cardControllers[i]['description']?.text = adminCard.description;
+          _cardControllers[i]['url']?.text = adminCard.url;
           _cardControllers[i]['imageUrl']?.text = adminCard.imageUrl;
           _cardImageUrls[i] = adminCard.imageUrl;
         }
@@ -341,11 +341,11 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
 
   Future<void> _saveAdminCard(int cardIndex) async {
     final titleController = _cardControllers[cardIndex]['title']!;
-    final descriptionController = _cardControllers[cardIndex]['description']!;
+    final urlController = _cardControllers[cardIndex]['url']!;
 
-    if (titleController.text.isEmpty || descriptionController.text.isEmpty) {
+    if (titleController.text.isEmpty || urlController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please fill title and description for Card ${cardIndex + 1}')),
+        SnackBar(content: Text('Please fill title and URL for Card ${cardIndex + 1}')),
       );
       return;
     }
@@ -356,7 +356,7 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
       // Create AdminCard object
       final adminCard = AdminCard(
         title: titleController.text,
-        description: descriptionController.text,
+        url: urlController.text,
         imageUrl: _cardImageUrls[cardIndex] ?? '',
         isActive: true,
         updatedAt: DateTime.now(),
@@ -426,20 +426,34 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _cardControllers[cardIndex]['title']?.clear();
-                  _cardControllers[cardIndex]['description']?.clear();
-                  _cardControllers[cardIndex]['imageUrl']?.clear();
-                  _cardImageUrls[cardIndex] = null;
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('🗑️ Card ${cardIndex + 1} cleared'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
+              onPressed: () async {
+                // Delete from database first
+                try {
+                  await AdminCardService.deleteAdminCard(cardIndex + 1);
+
+                  setState(() {
+                    _cardControllers[cardIndex]['title']?.clear();
+                    _cardControllers[cardIndex]['url']?.clear();
+                    _cardControllers[cardIndex]['imageUrl']?.clear();
+                    _cardImageUrls[cardIndex] = null;
+                  });
+
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('🗑️ Card ${cardIndex + 1} cleared successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ Error clearing Card ${cardIndex + 1}: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
@@ -775,7 +789,7 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
   Widget _buildAdminCardEditor(int cardIndex) {
     final isCurrentlyUploading = _isUploading && _currentUploadingCard == cardIndex;
     final hasData = _cardControllers[cardIndex]['title']!.text.isNotEmpty ||
-                    _cardControllers[cardIndex]['description']!.text.isNotEmpty ||
+                    _cardControllers[cardIndex]['url']!.text.isNotEmpty ||
                     _cardImageUrls[cardIndex] != null;
 
     return Container(
@@ -833,12 +847,13 @@ class _NewAdminPanelState extends State<NewAdminPanel> {
           const SizedBox(height: 8),
 
           TextField(
-            controller: _cardControllers[cardIndex]['description']!,
-            maxLines: 2,
+            controller: _cardControllers[cardIndex]['url']!,
+            maxLines: 1,
             decoration: const InputDecoration(
-              labelText: 'Card Description',
+              labelText: 'Card URL',
+              hintText: 'https://example.com',
               border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.description),
+              prefixIcon: Icon(Icons.link),
             ),
           ),
           const SizedBox(height: 8),

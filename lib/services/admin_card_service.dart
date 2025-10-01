@@ -33,11 +33,11 @@ class AdminCardService {
         for (final key in sortedKeys) {
           final cardData = data[key] as Map<dynamic, dynamic>;
 
-          // Only add card if it has title and description
+          // Only add card if it has title and url
           if (cardData['title'] != null &&
-              cardData['description'] != null &&
+              cardData['url'] != null &&
               cardData['title'].toString().trim().isNotEmpty &&
-              cardData['description'].toString().trim().isNotEmpty) {
+              cardData['url'].toString().trim().isNotEmpty) {
 
             final adminCard = AdminCard.fromJson(Map<String, dynamic>.from(cardData));
             if (adminCard.isActive) {

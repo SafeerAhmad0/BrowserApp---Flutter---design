@@ -41,8 +41,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
             setState(() {
               _isLoading = false;
             });
-            // Use consolidated ad service for banner ads
-            ConsolidatedAdService.injectAdsManually(_controller);
+            // Banner ads are now handled by admin cards
           },
         ),
       )
