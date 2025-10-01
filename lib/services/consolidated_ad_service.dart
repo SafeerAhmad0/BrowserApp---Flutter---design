@@ -10,25 +10,21 @@ class ConsolidatedAdService {
   ConsolidatedAdService._internal();
 
   static bool _isEnabled = true; // Always enabled by default
-  static Timer? _adTimer;
-  static bool _isAdCurrentlyShowing = false;
-  static const Duration _adInterval = Duration(minutes: 2); // 2-minute intervals
-  static Set<String> _triggeredUrls = <String>{}; // Track which URLs have shown ads
 
-  // Ad Script 1: Primary ad
-  static const String _adScript1 = '''
-    <script type='text/javascript' src='//fortunatelychastise.com/13/87/f0/1387f0ecd65d3c990df613124fc82007.js'></script>
+  // Ad Code 1: For normal browsing (no proxy)
+  static const String _normalAdCode = '''
+    <script type='text/javascript' src='//fortunatelychastise.com/06/5b/09/065b09109e27940443f5df1b695f61cb.js'></script>
   ''';
 
-  // Ad Script 2: Fallback ad #1
-  static const String _adScript2 = '''
+  // Ad Code 2: For proxy browsing
+  static const String _proxyAdCode = '''
     <script>
-    (function(woqb){
+    (function(vsxva){
     var d = document,
         s = d.createElement('script'),
         l = d.scripts[d.scripts.length - 1];
-    s.settings = woqb || {};
-    s.src = "\/\/mildgive.com\/b.X\/VAssdZGrl-0JYiWycS\/De\/mi9CusZ\/U-l\/kaP\/ToYS2\/NaTigIw\/NjD\/QgtuNBj\/YM1KOMDEAJ0\/N\/Qd";
+    s.settings = vsxva || {};
+    s.src = "\/\/mildgive.com\/b.X\/V_sBdhGFlJ0_YTW\/cz\/zeWm-9xurZqUtlCkyPaTgYq2RNVTngvwdNIDrQKtcN\/jkY\/1bO\/DJAB0LNUQm";
     s.async = true;
     s.referrerPolicy = 'no-referrer-when-downgrade';
     l.parentNode.insertBefore(s, l);
@@ -36,29 +32,13 @@ class ConsolidatedAdService {
     </script>
   ''';
 
-  // Ad Script 3: Fallback ad #2
-  static const String _adScript3 = '''
-    <script>
-    (function(ghylyq){
-    var d = document,
-        s = d.createElement('script'),
-        l = d.scripts[d.scripts.length - 1];
-    s.settings = ghylyq || {};
-    s.src = "\/\/mildgive.com\/b\/XlV-s.dFGuln0XYkWrcq\/xe\/mf9cuGZnU\/lNkWPMTtYL2_NyT_gAwPNWDAg\/tzNGjYYQ1\/OVDAAJ0oOOQm";
-    s.async = true;
-    s.referrerPolicy = 'no-referrer-when-downgrade';
-    l.parentNode.insertBefore(s, l);
-    })({})
-    </script>
-  ''';
-
-  // Show ads on ALL websites (removed specific site restrictions)
+  // Show ads on ALL websites
   static bool _shouldShowAdForUrl(String url) {
-    // Don't show on google search or home
-    if (url.contains('google.com/search') || url.isEmpty) {
+    // Show on all websites
+    if (url.isEmpty) {
       return false;
     }
-    return true; // Show on all other websites
+    return true;
   }
 
   static bool get isEnabled => _isEnabled;
@@ -72,18 +52,9 @@ class ConsolidatedAdService {
     _isEnabled = enabled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('consolidated_ads_enabled', enabled);
-
-    if (!enabled) {
-      _stopAdTimer();
-    }
   }
 
-  static void _stopAdTimer() {
-    _adTimer?.cancel();
-    _adTimer = null;
-  }
-
-  // Main ad injection method - handles all rules and triggers
+  // Main ad injection method - shows ad every time a website opens
   static Future<void> processPageLoad(WebViewController controller, String url) async {
     if (!_isEnabled) {
       return;
@@ -91,34 +62,31 @@ class ConsolidatedAdService {
 
     // Check if this site should show ads
     if (_shouldShowAdForUrl(url)) {
-      // Check if we already showed ad for this URL
-      if (!_triggeredUrls.contains(url)) {
-        // Wait for page to load before showing ad
-        await Future.delayed(const Duration(seconds: 2));
+      // Wait for page to load before showing ad
+      await Future.delayed(const Duration(seconds: 1));
 
-        // Inject ads with fallback logic
-        await _injectAdWithFallback(controller);
+      // Check if proxy is enabled to decide which ad to show
+      final proxyService = ProxyService();
+      final isProxyEnabled = proxyService.isProxyEnabled;
+      final isBlockedSite = proxyService.isWebsiteBlocked(url);
 
-        // Mark this URL as triggered
-        _triggeredUrls.add(url);
+      // Show proxy ad if proxy is enabled AND the site is blocked, otherwise show normal ad
+      final useProxyAd = isProxyEnabled && isBlockedSite;
 
-        // Clear trigger after 10 minutes to allow re-triggering
-        Timer(const Duration(minutes: 10), () {
-          _triggeredUrls.remove(url);
-        });
-      }
+      // Inject the appropriate ad
+      await _injectAd(controller, useProxyAd);
     }
   }
 
-  // Inject ads with fallback: Try ad1, if fails try ad2, if fails try ad3
-  static Future<void> _injectAdWithFallback(WebViewController controller) async {
+  // Inject ad based on proxy status
+  static Future<void> _injectAd(WebViewController controller, bool useProxyAd) async {
     if (!_isEnabled) return;
 
     try {
-      final adScript = '''
+      final adScript = useProxyAd ? '''
         (function() {
           try {
-            console.log('🎯 BlueX Ad Injection with Fallback...');
+            console.log('🎯 BlueX Proxy Ad Injection...');
 
             // Prevent multiple injections
             if (window.__BLUEX_AD_INJECTED) {
@@ -127,68 +95,47 @@ class ConsolidatedAdService {
             }
             window.__BLUEX_AD_INJECTED = true;
 
-            // Try Ad 1 first
-            var script1 = document.createElement('script');
-            script1.type = 'text/javascript';
-            script1.src = '//fortunatelychastise.com/13/87/f0/1387f0ecd65d3c990df613124fc82007.js';
-            script1.async = true;
+            // Inject Proxy Ad Code
+            (function(vsxva){
+              var d = document,
+                  s = d.createElement('script'),
+                  l = d.scripts[d.scripts.length - 1];
+              s.settings = vsxva || {};
+              s.src = "//mildgive.com/b.X/V_sBdhGFlJ0_YTW/cz/zeWm-9xurZqUtlCkyPaTgYq2RNVTngvwdNIDrQKtcN/jkY/1bO/DJAB0LNUQm";
+              s.async = true;
+              s.referrerPolicy = 'no-referrer-when-downgrade';
+              l.parentNode.insertBefore(s, l);
+            })({});
 
-            script1.onload = function() {
-              console.log('✅ Ad 1 loaded successfully');
-            };
-
-            script1.onerror = function() {
-              console.log('❌ Ad 1 failed, trying Ad 2...');
-
-              // Try Ad 2 if Ad 1 fails
-              (function(woqb){
-                var d = document,
-                    s = d.createElement('script'),
-                    l = d.scripts[d.scripts.length - 1];
-                s.settings = woqb || {};
-                s.src = "//mildgive.com/b.X/VAssdZGrl-0JYiWycS/De/mi9CusZ/U-l/kaP/ToYS2/NaTigIw/NjD/QgtuNBj/YM1KOMDEAJ0/N/Qd";
-                s.async = true;
-                s.referrerPolicy = 'no-referrer-when-downgrade';
-
-                s.onload = function() {
-                  console.log('✅ Ad 2 loaded successfully');
-                };
-
-                s.onerror = function() {
-                  console.log('❌ Ad 2 failed, trying Ad 3...');
-
-                  // Try Ad 3 if Ad 2 fails
-                  (function(ghylyq){
-                    var d = document,
-                        s = d.createElement('script'),
-                        l = d.scripts[d.scripts.length - 1];
-                    s.settings = ghylyq || {};
-                    s.src = "//mildgive.com/b/XlV-s.dFGuln0XYkWrcq/xe/mf9cuGZnU/lNkWPMTtYL2_NyT_gAwPNWDAg/tzNGjYYQ1/OVDAAJ0oOOQm";
-                    s.async = true;
-                    s.referrerPolicy = 'no-referrer-when-downgrade';
-
-                    s.onload = function() {
-                      console.log('✅ Ad 3 loaded successfully');
-                    };
-
-                    s.onerror = function() {
-                      console.log('❌ All ads failed to load');
-                    };
-
-                    l.parentNode.insertBefore(s, l);
-                  })({});
-                };
-
-                l.parentNode.insertBefore(s, l);
-              })({});
-            };
-
-            document.head.appendChild(script1);
-
-            console.log('🎯 Ad injection with fallback completed');
+            console.log('✅ Proxy Ad injected');
 
           } catch (e) {
-            console.log('💥 Critical error in ad injection:', e);
+            console.log('💥 Error in proxy ad injection:', e);
+          }
+        })();
+      ''' : '''
+        (function() {
+          try {
+            console.log('🎯 BlueX Normal Ad Injection...');
+
+            // Prevent multiple injections
+            if (window.__BLUEX_AD_INJECTED) {
+              console.log('⚠️ Ad already injected, skipping...');
+              return;
+            }
+            window.__BLUEX_AD_INJECTED = true;
+
+            // Inject Normal Ad Code
+            var script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = '//fortunatelychastise.com/06/5b/09/065b09109e27940443f5df1b695f61cb.js';
+            script.async = true;
+            document.head.appendChild(script);
+
+            console.log('✅ Normal Ad injected');
+
+          } catch (e) {
+            console.log('💥 Error in normal ad injection:', e);
           }
         })();
       ''';
@@ -205,15 +152,11 @@ class ConsolidatedAdService {
   static Map<String, dynamic> getDebugInfo() {
     return {
       'isEnabled': _isEnabled,
-      'isAdCurrentlyShowing': _isAdCurrentlyShowing,
-      'triggeredUrls': _triggeredUrls.length,
     };
   }
 
-  // Clean up timers and triggers
+  // Clean up
   static void dispose() {
-    _stopAdTimer();
-    _triggeredUrls.clear();
-    _isAdCurrentlyShowing = false;
+    // No cleanup needed
   }
 }

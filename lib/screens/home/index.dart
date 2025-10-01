@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../components/search_bar.dart' as custom;
-import '../../components/top_search_bar.dart';
 import '../../services/news_service.dart';
-import '../news/all_news_screen.dart';
-import '../news/news_detail_screen.dart';
 import '../notifications/notifications_screen.dart';
-import '../webview/web_view_screen.dart';
 import '../admin/new_admin_panel.dart';
 import '../../components/auth_dialog.dart';
 import '../../services/auth_service.dart';
@@ -18,15 +14,12 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../services/ad_block_service.dart';
-import '../../services/ad_overlay_service.dart';
 import '../../services/consolidated_ad_service.dart';
 import '../../services/history_service.dart';
 import '../../services/tab_service.dart';
 import '../tabs/tab_manager_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../models/tab.dart';
-import '../../components/native_ad_widget.dart';
-import '../../components/banner_ad_widget.dart';
 import '../../components/admin_card_widget.dart';
 import '../../services/admin_card_service.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -56,7 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isSearchFocused = false;
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 1;
-  final GlobalKey<TopSearchBarState> _searchBarKey = GlobalKey<TopSearchBarState>();
   bool _isDesktopMode = false;
   NewsLanguage _currentTranslationLanguage = NewsLanguage.english;
 
@@ -158,7 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
-    AdOverlayService.dispose();
     super.dispose();
   }
 
@@ -694,14 +685,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void _goHome() {
     setState(() {
       _isOnHomePage = true;
+      _currentController = null;
       _pageTitle = 'TORX';
       _currentUrl = '';
     });
   }
 
-  void _clearSearchBar() {
-    _searchBarKey.currentState?.clearText();
-  }
 
   String _formatUrl(String url) {
     // Remove https:// and www. for cleaner display
@@ -932,10 +921,7 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             }
           },
-          onNewTab: () {
-            _addNewTab('https://www.google.com');
-            Navigator.pop(context); // Close tab manager after creating new tab
-          },
+          onNewTab: _goHome,
         ),
       ),
     );
@@ -985,68 +971,68 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _showTranslateMenu() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              const Icon(Icons.translate, color: Color(0xFF2196F3)),
-              const SizedBox(width: 8),
-              Text(_isOnHomePage ? 'News Language' : 'Translate Page'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_isOnHomePage
-                  ? 'Choose language for news content:'
-                  : 'Choose a language to translate this page:'),
-              const SizedBox(height: 16),
-              ...NewsLanguage.values.map((language) => Container(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: language == _currentTranslationLanguage
-                      ? const Color(0xFF2196F3).withOpacity(0.1)
-                      : null,
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    language == _currentTranslationLanguage
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: language == _currentTranslationLanguage
-                        ? const Color(0xFF2196F3)
-                        : Colors.grey,
-                  ),
-                  title: Text(  
-                    language.displayName,
-                    style: TextStyle(
-                      fontWeight: language == _currentTranslationLanguage
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _translatePage(language);
-                  },
-                ),
-              )),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  // void _showTranslateMenu() {
+  //   showDialog(
+  //     context: context,
+  //     builder: (BuildContext context) {
+  //       return AlertDialog(
+  //         title: Row(
+  //           children: [
+  //             const Icon(Icons.translate, color: Color(0xFF2196F3)),
+  //             const SizedBox(width: 8),
+  //             Text(_isOnHomePage ? 'News Language' : 'Translate Page'),
+  //           ],
+  //         ),
+  //         content: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             Text(_isOnHomePage
+  //                 ? 'Choose language for news content:'
+  //                 : 'Choose a language to translate this page:'),
+  //             const SizedBox(height: 16),
+  //             ...NewsLanguage.values.map((language) => Container(
+  //               margin: const EdgeInsets.symmetric(vertical: 4),
+  //               decoration: BoxDecoration(
+  //                 borderRadius: BorderRadius.circular(8),
+  //                 color: language == _currentTranslationLanguage
+  //                     ? const Color(0xFF2196F3).withOpacity(0.1)
+  //                     : null,
+  //               ),
+  //               child: ListTile(
+  //                 leading: Icon(
+  //                   language == _currentTranslationLanguage
+  //                       ? Icons.radio_button_checked
+  //                       : Icons.radio_button_unchecked,
+  //                   color: language == _currentTranslationLanguage
+  //                       ? const Color(0xFF2196F3)
+  //                       : Colors.grey,
+  //                 ),
+  //                 title: Text(  
+  //                   language.displayName,
+  //                   style: TextStyle(
+  //                     fontWeight: language == _currentTranslationLanguage
+  //                         ? FontWeight.bold
+  //                         : FontWeight.normal,
+  //                   ),
+  //                 ),
+  //                 onTap: () {
+  //                   Navigator.pop(context);
+  //                   _translatePage(language);
+  //                 },
+  //               ),
+  //             )),
+  //           ],
+  //         ),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () => Navigator.pop(context),
+  //             child: const Text('Cancel'),
+  //           ),
+  //         ],
+  //       );
+  //     },
+  //   );
+  // }
 
   void _showSettingsMenu() {
     // Refresh admin status before showing menu
@@ -1075,40 +1061,40 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             // Translate option
-            ListTile(
-              leading: Icon(
-                Icons.translate,
-                color: _currentTranslationLanguage != NewsLanguage.english
-                  ? const Color(0xFF2196F3)
-                  : Colors.grey,
-              ),
-              title: Text(
-                _currentTranslationLanguage == NewsLanguage.english
-                    ? 'Translate Page'
-                    : 'Translate: ${_currentTranslationLanguage.displayName}',
-              ),
-              trailing: _currentTranslationLanguage != NewsLanguage.english
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2196F3),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'ON',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    )
-                  : const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                Navigator.pop(context);
-                _showTranslateMenu();
-              },
-            ),
+            // ListTile(
+            //   leading: Icon(
+            //     Icons.translate,
+            //     color: _currentTranslationLanguage != NewsLanguage.english
+            //       ? const Color(0xFF2196F3)
+            //       : Colors.grey,
+            //   ),
+            //   title: Text(
+            //     _currentTranslationLanguage == NewsLanguage.english
+            //         ? 'Translate Page'
+            //         : 'Translate: ${_currentTranslationLanguage.displayName}',
+            //   ),
+            //   trailing: _currentTranslationLanguage != NewsLanguage.english
+            //       ? Container(
+            //           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            //           decoration: BoxDecoration(
+            //             color: const Color(0xFF2196F3),
+            //             borderRadius: BorderRadius.circular(12),
+            //           ),
+            //           child: const Text(
+            //             'ON',
+            //             style: TextStyle(
+            //               color: Colors.white,
+            //               fontSize: 12,
+            //               fontWeight: FontWeight.bold,
+            //             ),
+            //           ),
+            //         )
+            //       : const Icon(Icons.arrow_forward_ios, size: 16),
+            //   onTap: () {
+            //     Navigator.pop(context);
+            //     _showTranslateMenu();
+            //   },
+            // ),
 
             // Desktop Mode (only show when browsing)
             if (!_isOnHomePage)
@@ -1248,14 +1234,14 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-        backgroundColor: const Color(0xFF121212), // Dark theme
+        backgroundColor: _isOnHomePage ? const Color(0xFF121212) : Colors.white, // Dark theme for home, white for webview
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Row(
           children: [
             // Home button
             IconButton(
-              icon: const Icon(Icons.home, color: Colors.white, size: 24),
+              icon: Icon(Icons.home, color: _isOnHomePage ? Colors.white : Colors.black, size: 24),
               onPressed: _goHome,
               tooltip: 'Home',
             ),
@@ -1367,13 +1353,12 @@ class _HomeScreenState extends State<HomeScreen> {
             IconButton(
               icon: Icon(
                 _isOnHomePage ? Icons.whatshot : Icons.add,
-                color: Colors.white,
+                color: _isOnHomePage ? Colors.white : Colors.black,
                 size: 24,
               ),
               onPressed: _isOnHomePage ? _clearCache : () {
-                _addNewTab('https://www.google.com');
-                // Clear search bar when creating new tab
-                _clearSearchBar();
+                // Navigate to home page instead of creating new tab
+                _goHome();
               },
               tooltip: _isOnHomePage ? 'Clear Cache' : 'New Tab',
             ),
@@ -1382,7 +1367,7 @@ class _HomeScreenState extends State<HomeScreen> {
             IconButton(
               icon: Stack(
                 children: [
-                  const Icon(Icons.tab, color: Colors.white, size: 24),
+                  Icon(Icons.tab, color: _isOnHomePage ? Colors.white : Colors.black, size: 24),
                   if (_tabs.isNotEmpty)
                     Positioned(
                       right: 0,
@@ -1416,7 +1401,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Three-dot menu
             IconButton(
-              icon: const Icon(Icons.more_vert, color: Colors.white, size: 24),
+              icon: Icon(Icons.more_vert, color: _isOnHomePage ? Colors.white : Colors.black, size: 24),
               onPressed: _showSettingsMenu,
               tooltip: 'Menu',
             ),
@@ -1688,37 +1673,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   // News Header Row
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        "📰 Latest News",
+                        "📰 News",
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1976D2),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AllNewsScreen(),
-                            ),
-                          );
-                        },
-                        style: TextButton.styleFrom(
-                          backgroundColor: const Color(0xFF2196F3),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        child: const Text("View All"),
                       ),
                     ],
                   ),
@@ -2078,6 +2041,7 @@ class _HomeScreenState extends State<HomeScreen> {
             items.add(AdminCardWidget(
               adminCard: adminCard,
               cardNumber: adminCardIndex + 1,
+              onTap: (url) => _addNewTab(url),
             ));
 
             // Add some spacing after the admin card
@@ -2100,12 +2064,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNewsCard(NewsArticle article) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => NewsDetailScreen(article: article),
-          ),
-        );
+        // Open news URL directly in browser
+        if (article.url.isNotEmpty) {
+          _addNewTab(article.url);
+        }
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(

@@ -48,8 +48,8 @@ class _TabManagerScreenState extends State<TabManagerScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              widget.onNewTab?.call();
               Navigator.pop(context);
+              widget.onNewTab?.call();
             },
             tooltip: 'New Tab',
           ),
@@ -225,8 +225,8 @@ class _TabManagerScreenState extends State<TabManagerScreen> {
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          widget.onNewTab?.call();
           Navigator.pop(context);
+          widget.onNewTab?.call();
         },
         backgroundColor: const Color(0xFF2196F3),
         foregroundColor: Colors.white,

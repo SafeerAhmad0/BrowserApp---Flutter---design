@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'dart:convert';
 import '../../services/ad_block_service.dart';
-import '../../services/ad_overlay_service.dart';
 import '../../services/history_service.dart';
 import '../../services/tab_service.dart';
 import '../../services/language_preference_service.dart';
@@ -274,17 +273,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
               } catch (e) {
               }
 
-              // Apply ad injection - ONLY ONCE PER PAGE LOAD
-              if (!_isAdBlockEnabled) {
-                // Inject ads when ad block is disabled
-                try {
-                  await AdOverlayService.injectAdScripts(_controller);
-                  AdOverlayService.showInitialAd(context, _controller);
-                  AdOverlayService.startAdTimer(context, _controller);
-                } catch (e) {
-                  // Silently handle any ad injection errors
-                }
-              }
+              // Ad injection handled by ConsolidatedAdService
 
               // Apply performance improvements
               {
@@ -393,7 +382,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
     // Update global services
     AdBlockService.setEnabled(_isAdBlockEnabled);
-    AdOverlayService.setAdBlockEnabled(_isAdBlockEnabled);
 
     // Reload page to apply changes
     _controller.reload();

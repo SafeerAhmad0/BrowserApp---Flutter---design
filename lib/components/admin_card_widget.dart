@@ -43,11 +43,13 @@ class AdminCard {
 class AdminCardWidget extends StatelessWidget {
   final AdminCard adminCard;
   final int cardNumber;
+  final Function(String)? onTap;
 
   const AdminCardWidget({
     super.key,
     required this.adminCard,
     required this.cardNumber,
+    this.onTap,
   });
 
   @override
@@ -63,15 +65,8 @@ class AdminCardWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: () {
             // Open URL when tapped
-            if (adminCard.url.isNotEmpty) {
-              // You'll need to import web_view_screen or use a URL launcher
-              // For now, show a snackbar - integrate with your navigation later
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Opening: ${adminCard.url}'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
+            if (adminCard.url.isNotEmpty && onTap != null) {
+              onTap!(adminCard.url);
             }
           },
           child: Column(
