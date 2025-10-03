@@ -1140,10 +1140,10 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
 
-            // Login/Signup
+            // Login
             ListTile(
               leading: const Icon(Icons.login, color: Color(0xFF2196F3)),
-              title: const Text('Login / Signup'),
+              title: const Text('Login'),
               onTap: () {
                 Navigator.pop(context);
                 showDialog(
@@ -1316,6 +1316,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFF2196F3).withOpacity(0.3),
+                            width: 1.5,
+                          ),
                         ),
                         child: Row(
                           children: [

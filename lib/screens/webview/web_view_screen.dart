@@ -29,7 +29,7 @@ class WebViewScreen extends StatefulWidget {
 class _WebViewScreenState extends State<WebViewScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
-  bool _isDesktopMode = false;
+  bool _isDesktopMode = true;
   bool _isAdBlockEnabled = false; // Default to show ads
   String? _currentTabId;
   NewsLanguage _currentTranslationLanguage = NewsLanguage.english;

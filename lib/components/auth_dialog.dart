@@ -13,8 +13,7 @@ class _AuthDialogState extends State<AuthDialog> with TickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
-  
-  bool _isLogin = true;
+
   bool _isLoading = false;
   late AnimationController _animationController;
   late Animation<double> _slideAnimation;
@@ -103,7 +102,7 @@ class _AuthDialogState extends State<AuthDialog> with TickerProviderStateMixin {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    _isLogin ? 'Welcome Back!' : 'Create Account',
+                                    'Welcome Back!',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 22,
@@ -115,9 +114,7 @@ class _AuthDialogState extends State<AuthDialog> with TickerProviderStateMixin {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _isLogin 
-                                ? 'Sign in to sync your data' 
-                                : 'Join to get started',
+                              'Sign in to access your account',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.8),
                                 fontSize: 14,
@@ -170,7 +167,7 @@ class _AuthDialogState extends State<AuthDialog> with TickerProviderStateMixin {
                               
                               const SizedBox(height: 20),
                               
-                              // Sign In/Up Button
+                              // Sign In Button
                               SizedBox(
                                 width: double.infinity,
                                 height: 50,
@@ -190,43 +187,17 @@ class _AuthDialogState extends State<AuthDialog> with TickerProviderStateMixin {
                                         height: 20,
                                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                       )
-                                    : Text(
-                                        _isLogin ? 'Sign In' : 'Create Account',
-                                        style: const TextStyle(
+                                    : const Text(
+                                        'Sign In',
+                                        style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                 ),
                               ),
-                              
+
                               const SizedBox(height: 14),
-                              
-                              // Toggle Login/Signup
-                              TextButton(
-                                onPressed: () {
-                                  setState(() => _isLogin = !_isLogin);
-                                },
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: const TextStyle(color: Colors.black87, fontSize: 14),
-                                    children: [
-                                      TextSpan(
-                                        text: _isLogin 
-                                          ? "Don't have an account? " 
-                                          : "Already have an account? ",
-                                      ),
-                                      TextSpan(
-                                        text: _isLogin ? 'Sign Up' : 'Sign In',
-                                        style: const TextStyle(
-                                          color: Color(0xFF667eea),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -302,17 +273,11 @@ class _AuthDialogState extends State<AuthDialog> with TickerProviderStateMixin {
     setState(() => _isLoading = true);
 
     try {
-      if (_isLogin) {
-        await _authService.signInWithEmailAndPassword(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
-      } else {
-        await _authService.registerWithEmailAndPassword(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
-      }
+      // Only allow sign in, no signup
+      await _authService.signInWithEmailAndPassword(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
 
       if (!mounted) return;
 

@@ -4,6 +4,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
 
 class NotificationService {
   static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
@@ -75,8 +79,9 @@ class NotificationService {
             final String title = (data["title"] ?? 'Announcement').toString();
             final String body = (data['body'] ?? '').toString();
             final String? actionUrl = (data['actionUrl'] as String?);
+            final String? imageUrl = (data['imageUrl'] as String?);
 
-            await showLocal(title: title, body: body, payload: actionUrl);
+            await showLocal(title: title, body: body, payload: actionUrl, imageUrl: imageUrl);
 
             // Update last seen
             await prefs.setInt('last_seen_notification_sent_at', sentAt);
@@ -158,23 +163,70 @@ class NotificationService {
     );
   }
 
+  static Future<String?> _downloadAndSaveImage(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final directory = await getTemporaryDirectory();
+        final fileName = 'notification_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final filePath = '${directory.path}/$fileName';
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+        return filePath;
+      }
+    } catch (e) {
+      print('Error downloading notification image: $e');
+    }
+    return null;
+  }
+
   static Future<void> showLocal({
     required String title,
     required String body,
     String? payload,
+    String? imageUrl,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
-      'browser_app_channel',
-      'Browser App Notifications',
-      channelDescription: 'Notifications from Browser App',
-      importance: Importance.high,
-      priority: Priority.high,
-      ticker: 'ticker',
-      autoCancel: true,
-      enableVibration: true,
-      playSound: true,
-      icon: '@mipmap/ic_launcher',
-    );
+    AndroidNotificationDetails androidDetails;
+
+    // Download and save the image if URL is provided
+    String? imagePath;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      imagePath = await _downloadAndSaveImage(imageUrl);
+    }
+
+    // Create notification with or without image
+    if (imagePath != null) {
+      androidDetails = AndroidNotificationDetails(
+        'browser_app_channel',
+        'Browser App Notifications',
+        channelDescription: 'Notifications from Browser App',
+        importance: Importance.high,
+        priority: Priority.high,
+        ticker: 'ticker',
+        autoCancel: true,
+        enableVibration: true,
+        playSound: true,
+        icon: '@mipmap/ic_launcher',
+        styleInformation: BigPictureStyleInformation(
+          FilePathAndroidBitmap(imagePath),
+          contentTitle: title,
+          summaryText: body,
+        ),
+      );
+    } else {
+      androidDetails = const AndroidNotificationDetails(
+        'browser_app_channel',
+        'Browser App Notifications',
+        channelDescription: 'Notifications from Browser App',
+        importance: Importance.high,
+        priority: Priority.high,
+        ticker: 'ticker',
+        autoCancel: true,
+        enableVibration: true,
+        playSound: true,
+        icon: '@mipmap/ic_launcher',
+      );
+    }
 
     const iOSDetails = DarwinNotificationDetails(
       presentAlert: true,
@@ -182,7 +234,7 @@ class NotificationService {
       presentSound: true,
     );
 
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iOSDetails,
     );
