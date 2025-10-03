@@ -11,6 +11,9 @@ import 'screens/home/index.dart';
 import 'screens/splash/splash_screen.dart';
 import 'components/earth_loader.dart';
 
+// Global navigator key for navigation from anywhere
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -37,6 +40,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: LanguageService.translate('app_name'),
       locale: Locale(LanguageService.currentLanguage),

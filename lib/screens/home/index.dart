@@ -17,6 +17,7 @@ import '../../services/ad_block_service.dart';
 import '../../services/consolidated_ad_service.dart';
 import '../../services/history_service.dart';
 import '../../services/tab_service.dart';
+import '../../services/notification_service.dart';
 import '../tabs/tab_manager_screen.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../models/tab.dart';
@@ -62,6 +63,15 @@ class _HomeScreenState extends State<HomeScreen> {
     // Listen to auth state changes to update admin status
     _authService.authStateChanges.listen((user) {
       _checkAdminStatus();
+    });
+
+    // Set up notification URL tap handler
+    NotificationService.setOnNotificationUrlTap((url) {
+      print('📱 Notification tapped, opening URL: $url');
+      if (mounted) {
+        // Open the URL in a new tab
+        _addNewTab(url);
+      }
     });
 
     // Removed automatic notifications slideshow popup
@@ -1234,6 +1244,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
+        toolbarHeight: 70,
         backgroundColor: _isOnHomePage ? const Color(0xFF121212) : Colors.white, // Dark theme for home, white for webview
         elevation: 0,
         automaticallyImplyLeading: false,
@@ -1249,7 +1260,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Current URL/Search bar display (or spacer on home page)
             Expanded(
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
                 child: !_isOnHomePage
                   ? GestureDetector(
                       onTap: () {
@@ -1312,10 +1323,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                       child: Container(
-                        height: 40,
+                        height: 46,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(23),
                           border: Border.all(
                             color: const Color(0xFF2196F3).withOpacity(0.3),
                             width: 1.5,

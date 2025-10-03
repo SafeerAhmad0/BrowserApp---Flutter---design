@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 
 class NotificationService {
@@ -80,6 +81,12 @@ class NotificationService {
             final String body = (data['body'] ?? '').toString();
             final String? actionUrl = (data['actionUrl'] as String?);
             final String? imageUrl = (data['imageUrl'] as String?);
+
+            print('🔥 NEW NOTIFICATION from Firebase:');
+            print('   Title: $title');
+            print('   Body: $body');
+            print('   Action URL: $actionUrl');
+            print('   Image URL: $imageUrl');
 
             await showLocal(title: title, body: body, payload: actionUrl, imageUrl: imageUrl);
 
@@ -163,19 +170,34 @@ class NotificationService {
     );
   }
 
-  static Future<String?> _downloadAndSaveImage(String url) async {
+  static Future<Uint8List?> _downloadImageBytes(String url) async {
     try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final directory = await getTemporaryDirectory();
-        final fileName = 'notification_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final filePath = '${directory.path}/$fileName';
-        final file = File(filePath);
-        await file.writeAsBytes(response.bodyBytes);
-        return filePath;
+      print('📥 Processing notification image: ${url.substring(0, 50)}...');
+
+      // Check if it's a base64 data URL
+      if (url.startsWith('data:image')) {
+        print('🖼️ Detected base64 image data URL');
+        // Extract base64 data from data URL format: data:image/png;base64,iVBORw0K...
+        final base64String = url.split(',')[1];
+        final bytes = base64Decode(base64String);
+        print('✅ Base64 image decoded successfully, size: ${bytes.length} bytes');
+        return bytes;
+      }
+      // Otherwise, treat it as a regular HTTP URL
+      else if (url.startsWith('http://') || url.startsWith('https://')) {
+        print('🌐 Detected HTTP URL, downloading...');
+        final response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          print('✅ Image downloaded successfully, size: ${response.bodyBytes.length} bytes');
+          return response.bodyBytes;
+        } else {
+          print('❌ Failed to download image, status code: ${response.statusCode}');
+        }
+      } else {
+        print('❌ Unknown image URL format');
       }
     } catch (e) {
-      print('Error downloading notification image: $e');
+      print('❌ Error processing notification image: $e');
     }
     return null;
   }
@@ -186,16 +208,35 @@ class NotificationService {
     String? payload,
     String? imageUrl,
   }) async {
+    print('🔔 Creating notification: $title');
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      print('🖼️ Image URL provided: $imageUrl');
+    }
+    if (payload != null && payload.isNotEmpty) {
+      print('🔗 Action URL provided: $payload');
+    }
+
+    // Add URL to notification body if present
+    String enhancedBody = body;
+    if (payload != null && payload.isNotEmpty) {
+      enhancedBody = '$body\n\n🔗 Tap to open: $payload';
+    }
+
     AndroidNotificationDetails androidDetails;
 
-    // Download and save the image if URL is provided
-    String? imagePath;
+    // Download image bytes if URL is provided
+    Uint8List? imageBytes;
     if (imageUrl != null && imageUrl.isNotEmpty) {
-      imagePath = await _downloadAndSaveImage(imageUrl);
+      imageBytes = await _downloadImageBytes(imageUrl);
+      if (imageBytes != null) {
+        print('✅ Using image in notification');
+      } else {
+        print('⚠️ Failed to download image, showing notification without image');
+      }
     }
 
     // Create notification with or without image
-    if (imagePath != null) {
+    if (imageBytes != null) {
       androidDetails = AndroidNotificationDetails(
         'browser_app_channel',
         'Browser App Notifications',
@@ -207,14 +248,16 @@ class NotificationService {
         enableVibration: true,
         playSound: true,
         icon: '@mipmap/ic_launcher',
+        largeIcon: ByteArrayAndroidBitmap(imageBytes),
         styleInformation: BigPictureStyleInformation(
-          FilePathAndroidBitmap(imagePath),
+          ByteArrayAndroidBitmap(imageBytes),
           contentTitle: title,
-          summaryText: body,
+          summaryText: enhancedBody,
+          largeIcon: ByteArrayAndroidBitmap(imageBytes),
         ),
       );
     } else {
-      androidDetails = const AndroidNotificationDetails(
+      androidDetails = AndroidNotificationDetails(
         'browser_app_channel',
         'Browser App Notifications',
         channelDescription: 'Notifications from Browser App',
@@ -225,6 +268,10 @@ class NotificationService {
         enableVibration: true,
         playSound: true,
         icon: '@mipmap/ic_launcher',
+        styleInformation: BigTextStyleInformation(
+          enhancedBody,
+          contentTitle: title,
+        ),
       );
     }
 
@@ -244,7 +291,7 @@ class NotificationService {
     await _localNotifications.show(
       notificationId,
       title,
-      body,
+      enhancedBody,
       details,
       payload: payload ?? '',
     );
@@ -255,16 +302,41 @@ class NotificationService {
     // Handle notification tap logic here
     final actionUrl = message.data['actionUrl'];
     if (actionUrl != null && actionUrl.isNotEmpty) {
-      // TODO: Navigate to URL or specific screen
+      _openUrl(actionUrl);
     }
   }
 
   static void _handleLocalNotificationTap(NotificationResponse response) {
     // Handle local notification tap
     final actionUrl = response.payload;
+    print('🔔 Notification tapped! Payload: $actionUrl');
     if (actionUrl != null && actionUrl.isNotEmpty) {
-      // TODO: Navigate to URL or specific screen
+      _openUrl(actionUrl);
     }
+  }
+
+  static void _openUrl(String url) {
+    try {
+      print('🌐 Opening URL from notification: $url');
+
+      // Import the navigator key from main.dart
+      // We'll need to use url_launcher or navigate to WebViewScreen
+      // For now, let's use a simple approach with a global callback
+      if (_onNotificationUrlTap != null) {
+        _onNotificationUrlTap!(url);
+      } else {
+        print('⚠️ No URL tap handler registered');
+      }
+    } catch (e) {
+      print('❌ Error opening URL: $e');
+    }
+  }
+
+  // Callback for handling URL taps
+  static Function(String)? _onNotificationUrlTap;
+
+  static void setOnNotificationUrlTap(Function(String) callback) {
+    _onNotificationUrlTap = callback;
   }
 
   static Future<String?> getToken() async {

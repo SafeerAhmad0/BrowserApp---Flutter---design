@@ -32,12 +32,53 @@ class ConsolidatedAdService {
     </script>
   ''';
 
-  // Show ads on ALL websites
+  // Show ads ONLY on actual websites, NOT on search engines
   static bool _shouldShowAdForUrl(String url) {
-    // Show on all websites
     if (url.isEmpty) {
       return false;
     }
+
+    final uri = Uri.tryParse(url.toLowerCase());
+    if (uri == null) {
+      return false;
+    }
+
+    // List of search engines and pages where we DON'T want to show ads
+    final excludedDomains = [
+      'google.com',
+      'www.google.com',
+      'bing.com',
+      'www.bing.com',
+      'yahoo.com',
+      'www.yahoo.com',
+      'duckduckgo.com',
+      'www.duckduckgo.com',
+      'search.yahoo.com',
+      'yandex.com',
+      'www.yandex.com',
+      'baidu.com',
+      'www.baidu.com',
+      'ask.com',
+      'www.ask.com',
+    ];
+
+    // Check if the URL is a search engine
+    final host = uri.host;
+    for (final domain in excludedDomains) {
+      if (host == domain || host.endsWith('.$domain')) {
+        return false; // Don't show ads on search engines
+      }
+    }
+
+    // Check if it's a search results page (has search query parameters)
+    final searchParams = ['q', 'query', 'search', 's'];
+    for (final param in searchParams) {
+      if (uri.queryParameters.containsKey(param)) {
+        return false; // Don't show ads on search result pages
+      }
+    }
+
+    // Show ads on actual websites
     return true;
   }
 
