@@ -981,68 +981,68 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // void _showTranslateMenu() {
-  //   showDialog(
-  //     context: context,
-  //     builder: (BuildContext context) {
-  //       return AlertDialog(
-  //         title: Row(
-  //           children: [
-  //             const Icon(Icons.translate, color: Color(0xFF2196F3)),
-  //             const SizedBox(width: 8),
-  //             Text(_isOnHomePage ? 'News Language' : 'Translate Page'),
-  //           ],
-  //         ),
-  //         content: Column(
-  //           mainAxisSize: MainAxisSize.min,
-  //           children: [
-  //             Text(_isOnHomePage
-  //                 ? 'Choose language for news content:'
-  //                 : 'Choose a language to translate this page:'),
-  //             const SizedBox(height: 16),
-  //             ...NewsLanguage.values.map((language) => Container(
-  //               margin: const EdgeInsets.symmetric(vertical: 4),
-  //               decoration: BoxDecoration(
-  //                 borderRadius: BorderRadius.circular(8),
-  //                 color: language == _currentTranslationLanguage
-  //                     ? const Color(0xFF2196F3).withOpacity(0.1)
-  //                     : null,
-  //               ),
-  //               child: ListTile(
-  //                 leading: Icon(
-  //                   language == _currentTranslationLanguage
-  //                       ? Icons.radio_button_checked
-  //                       : Icons.radio_button_unchecked,
-  //                   color: language == _currentTranslationLanguage
-  //                       ? const Color(0xFF2196F3)
-  //                       : Colors.grey,
-  //                 ),
-  //                 title: Text(  
-  //                   language.displayName,
-  //                   style: TextStyle(
-  //                     fontWeight: language == _currentTranslationLanguage
-  //                         ? FontWeight.bold
-  //                         : FontWeight.normal,
-  //                   ),
-  //                 ),
-  //                 onTap: () {
-  //                   Navigator.pop(context);
-  //                   _translatePage(language);
-  //                 },
-  //               ),
-  //             )),
-  //           ],
-  //         ),
-  //         actions: [
-  //           TextButton(
-  //             onPressed: () => Navigator.pop(context),
-  //             child: const Text('Cancel'),
-  //           ),
-  //         ],
-  //       );
-  //     },
-  //   );
-  // }
+  void _showTranslateMenu() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.translate, color: Color(0xFF2196F3)),
+              const SizedBox(width: 8),
+              Text(_isOnHomePage ? 'News Language' : 'Translate Page'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_isOnHomePage
+                  ? 'Choose language for news content:'
+                  : 'Choose a language to translate this page:'),
+              const SizedBox(height: 16),
+              ...NewsLanguage.values.map((language) => Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: language == _currentTranslationLanguage
+                      ? const Color(0xFF2196F3).withOpacity(0.1)
+                      : null,
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    language == _currentTranslationLanguage
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: language == _currentTranslationLanguage
+                        ? const Color(0xFF2196F3)
+                        : Colors.grey,
+                  ),
+                  title: Text(
+                    language.displayName,
+                    style: TextStyle(
+                      fontWeight: language == _currentTranslationLanguage
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _translatePage(language);
+                  },
+                ),
+              )),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   void _showSettingsMenu() {
     // Refresh admin status before showing menu
@@ -1071,40 +1071,40 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             // Translate option
-            // ListTile(
-            //   leading: Icon(
-            //     Icons.translate,
-            //     color: _currentTranslationLanguage != NewsLanguage.english
-            //       ? const Color(0xFF2196F3)
-            //       : Colors.grey,
-            //   ),
-            //   title: Text(
-            //     _currentTranslationLanguage == NewsLanguage.english
-            //         ? 'Translate Page'
-            //         : 'Translate: ${_currentTranslationLanguage.displayName}',
-            //   ),
-            //   trailing: _currentTranslationLanguage != NewsLanguage.english
-            //       ? Container(
-            //           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            //           decoration: BoxDecoration(
-            //             color: const Color(0xFF2196F3),
-            //             borderRadius: BorderRadius.circular(12),
-            //           ),
-            //           child: const Text(
-            //             'ON',
-            //             style: TextStyle(
-            //               color: Colors.white,
-            //               fontSize: 12,
-            //               fontWeight: FontWeight.bold,
-            //             ),
-            //           ),
-            //         )
-            //       : const Icon(Icons.arrow_forward_ios, size: 16),
-            //   onTap: () {
-            //     Navigator.pop(context);
-            //     _showTranslateMenu();
-            //   },
-            // ),
+            ListTile(
+              leading: Icon(
+                Icons.translate,
+                color: _currentTranslationLanguage != NewsLanguage.english
+                  ? const Color(0xFF2196F3)
+                  : Colors.grey,
+              ),
+              title: Text(
+                _currentTranslationLanguage == NewsLanguage.english
+                    ? 'Translate Page'
+                    : 'Translate: ${_currentTranslationLanguage.displayName}',
+              ),
+              trailing: _currentTranslationLanguage != NewsLanguage.english
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2196F3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'ON',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.pop(context);
+                _showTranslateMenu();
+              },
+            ),
 
             // Desktop Mode (only show when browsing)
             if (!_isOnHomePage)
@@ -1455,19 +1455,26 @@ class _HomeScreenState extends State<HomeScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
           children: [
-            // TORX Header with colored letters - TOR normal, X bold italic
+            // TORX Header with colored letters - Clean design
             Container(
-              margin: const EdgeInsets.symmetric(vertical: 10),
+              margin: const EdgeInsets.symmetric(vertical: 20),
               child: RichText(
                 textAlign: TextAlign.center,
                 text: const TextSpan(
                   style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.normal,
+                    fontSize: 60,
+                    fontWeight: FontWeight.w300,
+                    letterSpacing: 4.0,
+                    height: 1.2,
                     shadows: [
                       Shadow(
+                        offset: Offset(0, 4),
+                        blurRadius: 12,
+                        color: Colors.black45,
+                      ),
+                      Shadow(
                         offset: Offset(0, 2),
-                        blurRadius: 6,
+                        blurRadius: 4,
                         color: Colors.black26,
                       ),
                     ],
@@ -1475,23 +1482,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     TextSpan(
                       text: 'T',
-                      style: TextStyle(color: Color(0xFF9C27B0)), // Purple
+                      style: TextStyle(
+                        color: Color(0xFF9C27B0), // Purple
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                     TextSpan(
                       text: 'O',
-                      style: TextStyle(color: Color(0xFF4CAF50)), // Green
+                      style: TextStyle(
+                        color: Color(0xFF4CAF50), // Green
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                     TextSpan(
                       text: 'R',
-                      style: TextStyle(color: Color(0xFF2196F3)), // Blue
+                      style: TextStyle(
+                        color: Color(0xFF2196F3), // Blue
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                     TextSpan(
                       text: 'X',
                       style: TextStyle(
                         color: Color(0xFFE53935), // Red
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w900,
                         fontStyle: FontStyle.italic,
-                        fontSize: 56, // Slightly bigger for emphasis
+                        fontSize: 70,
+                        letterSpacing: 2.0,
                       ),
                     ),
                   ],
@@ -1619,83 +1636,97 @@ class _HomeScreenState extends State<HomeScreen> {
             // 📰 News Section Header
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withOpacity(0.08),
                     offset: const Offset(0, -2),
-                    blurRadius: 15,
+                    blurRadius: 12,
                   ),
                 ],
               ),
               child: Column(
                 children: [
-                  // Language Selector Row
+                  // News Header
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.language, color: Color(0xFF2196F3), size: 18),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'News Language:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      DropdownButton<NewsLanguage>(
-                        value: LanguagePreferenceService.currentLanguage,
-                        onChanged: _isTranslating ? null : (NewsLanguage? newLanguage) async {
-                          if (newLanguage != null && newLanguage != LanguagePreferenceService.currentLanguage) {
-                            await LanguagePreferenceService.setLanguagePreference(newLanguage);
-
-                            // Show loading immediately
-                            setState(() {
-                              _isLoadingNews = true;
-                              _isTranslating = newLanguage != NewsLanguage.english;
-                              _translationStatus = newLanguage != NewsLanguage.english
-                                ? 'Switching to ${newLanguage.displayName}...'
-                                : '';
-                            });
-
-                            await _loadNews();
-                          }
-                        },
-                        items: LanguagePreferenceService.availableLanguages.map((language) {
-                          return DropdownMenuItem<NewsLanguage>(
-                            value: language,
-                            child: Text(
-                              language.displayName,
-                              style: const TextStyle(fontSize: 14),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.article_outlined,
+                            color: Color(0xFF2196F3),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            "News",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1976D2),
+                              letterSpacing: 0.3,
                             ),
-                          );
-                        }).toList(),
-                        underline: Container(),
-                        style: const TextStyle(
-                          color: Color(0xFF2196F3),
-                          fontWeight: FontWeight.w500,
-                        ),
-                        dropdownColor: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // News Header Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        "📰 News",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1976D2),
+                      // Language Selector - compact
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Color(0xFF2196F3).withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.translate, color: Color(0xFF2196F3), size: 16),
+                            const SizedBox(width: 6),
+                            DropdownButton<NewsLanguage>(
+                              value: LanguagePreferenceService.currentLanguage,
+                              onChanged: _isTranslating ? null : (NewsLanguage? newLanguage) async {
+                                if (newLanguage != null && newLanguage != LanguagePreferenceService.currentLanguage) {
+                                  await LanguagePreferenceService.setLanguagePreference(newLanguage);
+
+                                  // Show loading immediately
+                                  setState(() {
+                                    _isLoadingNews = true;
+                                    _isTranslating = newLanguage != NewsLanguage.english;
+                                    _translationStatus = newLanguage != NewsLanguage.english
+                                      ? 'Switching to ${newLanguage.displayName}...'
+                                      : '';
+                                  });
+
+                                  await _loadNews();
+                                }
+                              },
+                              items: LanguagePreferenceService.availableLanguages.map((language) {
+                                return DropdownMenuItem<NewsLanguage>(
+                                  value: language,
+                                  child: Text(
+                                    language.displayName,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                );
+                              }).toList(),
+                              underline: Container(),
+                              style: const TextStyle(
+                                color: Color(0xFF2196F3),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                              dropdownColor: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              isDense: true,
+                            ),
+                          ],
                         ),
                       ),
                     ],
