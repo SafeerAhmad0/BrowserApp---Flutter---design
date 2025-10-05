@@ -22,33 +22,56 @@ class NotificationService {
       android: androidInitialize,
       iOS: iOSInitialize,
     );
-    
+
     await _localNotifications.initialize(
       initializationsSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         _handleLocalNotificationTap(response);
       },
     );
-    
+
+    // Check if app was launched from a local notification tap
+    print('🔍 Checking if app was launched from notification...');
+    final notificationAppLaunchDetails = await _localNotifications.getNotificationAppLaunchDetails();
+    print('🔍 notificationAppLaunchDetails: $notificationAppLaunchDetails');
+    print('🔍 didNotificationLaunchApp: ${notificationAppLaunchDetails?.didNotificationLaunchApp}');
+
+    if (notificationAppLaunchDetails?.didNotificationLaunchApp ?? false) {
+      final response = notificationAppLaunchDetails!.notificationResponse;
+      print('🚀 ✅ YES! App WAS launched from local notification!');
+      print('🚀 Response: $response');
+      print('🚀 Payload: ${response?.payload}');
+
+      if (response != null) {
+        print('🚀 Calling _handleLocalNotificationTap with payload: ${response.payload}');
+        await _handleLocalNotificationTap(response);
+        print('✅ ✅ Finished handling notification launch');
+      } else {
+        print('❌ Response is null!');
+      }
+    } else {
+      print('🔍 ❌ App was NOT launched from notification (normal launch)');
+    }
+
     // Handle background messages
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    
+
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       _showLocalNotification(message);
     });
-    
+
     // Handle notification taps when app is terminated or in background
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       _handleNotificationTap(message);
     });
-    
+
     // Check for initial message if app was opened from a notification
     final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
       _handleNotificationTap(initialMessage);
     }
-    
+
     // Start listening to Realtime Database for admin notifications
     await _startRealtimeNotificationListener();
   }
@@ -306,29 +329,42 @@ class NotificationService {
     }
   }
 
-  static void _handleLocalNotificationTap(NotificationResponse response) {
+  static Future<void> _handleLocalNotificationTap(NotificationResponse response) async {
     // Handle local notification tap
     final actionUrl = response.payload;
     print('🔔 Notification tapped! Payload: $actionUrl');
     if (actionUrl != null && actionUrl.isNotEmpty) {
-      _openUrl(actionUrl);
+      await _openUrl(actionUrl);
     }
   }
 
-  static void _openUrl(String url) {
+  static Future<void> _openUrl(String url) async {
     try {
-      print('🌐 Opening URL from notification: $url');
+      print('🌐 _openUrl called with URL: $url');
+      print('🌐 Callback registered? ${_onNotificationUrlTap != null}');
 
       // Import the navigator key from main.dart
       // We'll need to use url_launcher or navigate to WebViewScreen
       // For now, let's use a simple approach with a global callback
       if (_onNotificationUrlTap != null) {
+        print('✅ Callback IS registered, calling it NOW with URL: $url');
         _onNotificationUrlTap!(url);
+        print('✅ Callback executed successfully');
       } else {
-        print('⚠️ No URL tap handler registered');
+        print('⚠️ Callback NOT registered yet, saving URL to SharedPreferences for later');
+        // Save the URL to be opened when app is ready
+        final prefs = await SharedPreferences.getInstance();
+        print('💾 Got SharedPreferences instance, saving URL: $url');
+        await prefs.setString('pending_notification_url', url);
+        print('💾 ✅ SAVED URL to SharedPreferences: $url');
+
+        // Verify it was saved
+        final savedUrl = prefs.getString('pending_notification_url');
+        print('💾 ✅ VERIFIED - URL in SharedPreferences: $savedUrl');
       }
     } catch (e) {
-      print('❌ Error opening URL: $e');
+      print('❌ Error in _openUrl: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
     }
   }
 
@@ -337,6 +373,28 @@ class NotificationService {
 
   static void setOnNotificationUrlTap(Function(String) callback) {
     _onNotificationUrlTap = callback;
+  }
+
+  // Check for pending notification URL and open it
+  static Future<String?> getPendingNotificationUrl() async {
+    try {
+      print('🔍 getPendingNotificationUrl: Starting check...');
+      final prefs = await SharedPreferences.getInstance();
+      final url = prefs.getString('pending_notification_url');
+      print('🔍 getPendingNotificationUrl: Raw value from SharedPreferences: $url');
+      if (url != null && url.isNotEmpty) {
+        // Clear it after reading
+        await prefs.remove('pending_notification_url');
+        print('📱 ✅ Found pending notification URL: $url');
+        print('📱 ✅ Cleared from SharedPreferences');
+        return url;
+      } else {
+        print('📱 ❌ No pending notification URL in SharedPreferences');
+      }
+    } catch (e) {
+      print('❌ Error getting pending notification URL: $e');
+    }
+    return null;
   }
 
   static Future<String?> getToken() async {

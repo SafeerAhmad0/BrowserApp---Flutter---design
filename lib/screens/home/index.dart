@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentPage = 1;
   bool _isDesktopMode = false;
   NewsLanguage _currentTranslationLanguage = NewsLanguage.english;
+  bool _isPageLoading = false;
 
   @override
   void initState() {
@@ -69,8 +70,14 @@ class _HomeScreenState extends State<HomeScreen> {
     NotificationService.setOnNotificationUrlTap((url) {
       print('📱 Notification tapped, opening URL: $url');
       if (mounted) {
+        // Fix URL if it doesn't have a scheme
+        String fixedUrl = url;
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          fixedUrl = 'https://$url';
+          print('📱 Fixed URL to: $fixedUrl');
+        }
         // Open the URL in a new tab
-        _addNewTab(url);
+        _addNewTab(fixedUrl);
       }
     });
 
@@ -94,6 +101,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Load news with the correct language
     await _loadNews();
+
+    // Check for pending notification URL (when app was opened from notification while closed)
+    print('🔍 Checking for pending notification URL...');
+    final pendingUrl = await NotificationService.getPendingNotificationUrl();
+    print('🔍 Pending URL result: $pendingUrl');
+    if (pendingUrl != null && pendingUrl.isNotEmpty && mounted) {
+      print('📱 ✅ Found pending notification URL: $pendingUrl');
+      // Fix URL if it doesn't have a scheme
+      String fixedUrl = pendingUrl;
+      if (!pendingUrl.startsWith('http://') && !pendingUrl.startsWith('https://')) {
+        fixedUrl = 'https://$pendingUrl';
+        print('📱 Fixed URL to: $fixedUrl');
+      }
+      // Use post frame callback to ensure widget tree is fully built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          print('📱 🚀 NOW Opening pending notification URL in webview: $fixedUrl');
+          _addNewTab(fixedUrl);
+        }
+      });
+    } else {
+      print('📱 ❌ No pending notification URL found');
+    }
   }
 
   Future<void> _loadSavedTabs() async {
@@ -622,6 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _addNewTab(String url) {
+    print('🌐 _addNewTab called with URL: $url');
     late WebViewController tabController;
 
     tabController = WebViewController()
@@ -632,9 +663,11 @@ class _HomeScreenState extends State<HomeScreen> {
             return AdBlockService.handleNavigation(request);
           },
           onPageStarted: (String tabUrl) {
+            print('🌐 Page started loading: $tabUrl');
             setState(() {
               _isOnHomePage = false;
               _currentUrl = tabUrl;
+              _isPageLoading = true;
             });
           },
           onPageFinished: (String tabUrl) async {
@@ -654,6 +687,7 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               _currentUrl = tabUrl;
               _pageTitle = title ?? 'Untitled';
+              _isPageLoading = false;
               if (_tabs.isNotEmpty && _activeTabIndex < _tabs.length) {
                 final currentTab = _tabs[_activeTabIndex];
                 _tabs[_activeTabIndex] = currentTab.copyWith(
@@ -686,6 +720,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _currentController = tabController;
       _isOnHomePage = false;
       _currentUrl = url;
+      print('🌐 Tab created! _isOnHomePage = $_isOnHomePage, tabs count: ${_tabs.length}');
     });
 
     // Save tab to storage
@@ -1248,6 +1283,16 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: _isOnHomePage ? const Color(0xFF121212) : Colors.white, // Dark theme for home, white for webview
         elevation: 0,
         automaticallyImplyLeading: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(3),
+          child: _isPageLoading && !_isOnHomePage
+              ? const LinearProgressIndicator(
+                  backgroundColor: Colors.transparent,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+                  minHeight: 3,
+                )
+              : const SizedBox(height: 3),
+        ),
         title: Row(
           children: [
             // Home button
@@ -1259,8 +1304,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Current URL/Search bar display (or spacer on home page)
             Expanded(
+              flex: 3,
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
+                margin: const EdgeInsets.only(left: 2, right: 2),
                 child: !_isOnHomePage
                   ? GestureDetector(
                       onTap: () {
@@ -1328,7 +1374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(23),
                           border: Border.all(
-                            color: const Color(0xFF2196F3).withOpacity(0.3),
+                            color: Colors.black,
                             width: 1.5,
                           ),
                         ),
